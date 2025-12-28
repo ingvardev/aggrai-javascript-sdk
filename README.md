@@ -1,174 +1,203 @@
 # AI Aggregator
 
-[English](#english) | [Русский](#русский)
+Унифицированная платформа для работы с различными AI-провайдерами (OpenAI, Claude, Ollama) через единый GraphQL API.
 
----
+## ✨ Возможности
 
-## Русский
+- 🚀 **Асинхронная обработка** — создание AI-запросов с фоновой обработкой через Redis/asynq
+- 🔄 **Мульти-провайдеры** — OpenAI, Claude, Ollama, Stub (для тестов)
+- 📊 **Отслеживание использования** — токены, стоимость по провайдерам и тенантам
+- 🔐 **API-ключи** — мультитенантная аутентификация
+- 🎮 **GraphQL Playground** — интерактивное тестирование API
 
-### Описание
+## 🏗️ Архитектура
 
-AI Aggregator — платформа для унифицированного доступа к различным AI-провайдерам (OpenAI, Claude, локальные модели) через единый API и веб-дашборд.
-
-### Возможности
-
-- 🚀 Создание AI-запросов (текст/изображения) с асинхронной обработкой
-- 🔄 Абстракция провайдеров с автоматической маршрутизацией
-- 📊 Отслеживание использования (токены/стоимость) по провайдерам и тенантам
-- 🔐 Аутентификация через API-ключи
-- 🖥️ Веб-дашборд: список задач, детали, статус провайдеров, метрики
-
-### Технологии
-
-**Backend:**
-- Go 1.22+
-- GraphQL (gqlgen)
-- PostgreSQL + sqlc
-- Redis + asynq (очереди)
-
-**Frontend:**
-- Next.js 14 (App Router)
-- TypeScript
-- shadcn/ui + Radix UI
-- Tailwind CSS
-
-### Быстрый старт
-
-```bash
-# Клонирование
-git clone <repo-url>
-cd AIAggregator
-
-# Запуск инфраструктуры
-docker-compose up -d
-
-# Backend API
-cd apps/api
-go run ./cmd/server
-
-# Worker
-cd apps/worker
-go run ./cmd/worker
-
-# Frontend
-cd apps/web
-npm install
-npm run dev
+```
+┌─────────────────┐     ┌──────────────────┐
+│   GraphQL API   │     │     Worker       │
+│    (:8080)      │     │   (asynq)        │
+└────────┬────────┘     └────────┬─────────┘
+         │                       │
+         └───────────┬───────────┘
+                     │
+              ┌──────▼──────┐
+              │  PostgreSQL │
+              │   (jobs)    │
+              └──────┬──────┘
+                     │
+              ┌──────▼──────┐
+              │    Redis    │
+              │   (queue)   │
+              └─────────────┘
 ```
 
-### Структура проекта
+## 🚀 Быстрый старт
+
+### 1. Запуск инфраструктуры
+
+```bash
+docker compose up -d postgres redis
+```
+
+### 2. Применение миграций
+
+```bash
+./scripts/migrate.sh
+```
+
+### 3. Запуск API сервера
+
+```bash
+go run ./apps/api/cmd/server
+```
+
+### 4. Запуск Worker (в отдельном терминале)
+
+```bash
+go run ./apps/worker/cmd/worker
+```
+
+### 5. Тестирование
+
+```bash
+# GraphQL Playground
+open http://localhost:8080/playground
+
+# Или через curl
+curl -X POST http://localhost:8080/graphql \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-api-key-12345" \
+  -d '{"query":"mutation { createJob(input: { type: TEXT, input: \"Hello AI!\" }) { id status } }"}'
+```
+
+## 📁 Структура проекта
 
 ```
 AIAggregator/
 ├── apps/
-│   ├── api/          # GraphQL API сервер
-│   ├── worker/       # Asynq воркер
-│   └── web/          # Next.js фронтенд
+│   ├── api/              # GraphQL API сервер
+│   │   ├── cmd/server/   # Точка входа
+│   │   └── internal/
+│   │       ├── graph/    # GraphQL resolvers (gqlgen)
+│   │       ├── handlers/ # HTTP handlers
+│   │       └── middleware/
+│   ├── worker/           # Asynq worker
+│   └── web/              # Next.js фронтенд (WIP)
 ├── packages/
-│   ├── domain/       # Доменные сущности
-│   ├── usecases/     # Бизнес-логика
-│   ├── providers/    # AI провайдеры
-│   └── shared/       # Общие утилиты
-└── infrastructure/
-    └── postgres/     # Миграции БД
+│   ├── domain/           # Доменные сущности (Job, Tenant, Usage)
+│   ├── usecases/         # Бизнес-логика (JobService, AuthService)
+│   ├── providers/        # AI провайдеры (OpenAI, Claude, Stub)
+│   ├── adapters/         # Репозитории (PostgreSQL, InMemory)
+│   ├── queue/            # Очередь задач (asynq)
+│   └── shared/           # Конфигурация, логгер
+├── infrastructure/
+│   ├── postgres/
+│   │   ├── migrations/   # SQL миграции
+│   │   ├── queries/      # sqlc queries
+│   │   └── db/           # Сгенерированный sqlc код
+│   └── docker/           # Dockerfiles
+├── docker-compose.yml
+├── gqlgen.yml
+└── go.mod
 ```
 
-### Переменные окружения
+## ⚙️ Конфигурация
+
+Создайте `.env` файл (см. `.env.example`):
 
 ```env
+# Server
+API_HOST=0.0.0.0
+API_PORT=8080
+
 # Database
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/aiaggregator?sslmode=disable
 
 # Redis
 REDIS_URL=redis://localhost:6379
 
-# Server
-API_PORT=8080
+# AI Providers (опционально)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+OLLAMA_URL=http://localhost:11434
+
+# Features
+ENABLE_PLAYGROUND=true
+LOG_LEVEL=debug
 ```
 
----
+## 🔌 GraphQL API
 
-## English
+### Queries
 
-### Description
+```graphql
+# Текущий тенант
+query { me { id name active } }
 
-AI Aggregator is a platform for unified access to various AI providers (OpenAI, Claude, local models) through a single API and web dashboard.
+# Получить job по ID
+query { job(id: "...") { id status result provider tokensIn tokensOut cost } }
 
-### Features
+# Список jobs
+query { jobs { edges { node { id status type } } pageInfo { totalCount } } }
 
-- 🚀 Create AI requests (text/images) with async processing
-- 🔄 Provider abstraction with automatic routing
-- 📊 Usage tracking (tokens/cost) per provider per tenant
-- 🔐 API key authentication
-- 🖥️ Web dashboard: job list, details, provider status, metrics
+# Список провайдеров
+query { providers { id name type enabled } }
+```
 
-### Tech Stack
+### Mutations
 
-**Backend:**
-- Go 1.22+
-- GraphQL (gqlgen)
-- PostgreSQL + sqlc
-- Redis + asynq (queues)
+```graphql
+# Создать job
+mutation {
+  createJob(input: { type: TEXT, input: "Расскажи про Go" }) {
+    id status
+  }
+}
 
-**Frontend:**
-- Next.js 14 (App Router)
-- TypeScript
-- shadcn/ui + Radix UI
-- Tailwind CSS
+# Отменить job
+mutation { cancelJob(id: "...") { id status } }
+```
 
-### Quick Start
+## 🔧 Разработка
+
+### Генерация GraphQL
 
 ```bash
-# Clone
-git clone <repo-url>
-cd AIAggregator
-
-# Start infrastructure
-docker-compose up -d
-
-# Backend API
-cd apps/api
-go run ./cmd/server
-
-# Worker
-cd apps/worker
-go run ./cmd/worker
-
-# Frontend
-cd apps/web
-npm install
-npm run dev
+cd apps/api && ~/go/bin/gqlgen generate
 ```
 
-### Project Structure
+### Генерация sqlc
 
-```
-AIAggregator/
-├── apps/
-│   ├── api/          # GraphQL API server
-│   ├── worker/       # Asynq worker
-│   └── web/          # Next.js frontend
-├── packages/
-│   ├── domain/       # Domain entities
-│   ├── usecases/     # Business logic
-│   ├── providers/    # AI providers
-│   └── shared/       # Shared utilities
-└── infrastructure/
-    └── postgres/     # DB migrations
+```bash
+cd infrastructure/postgres && ~/go/bin/sqlc generate
 ```
 
-### Environment Variables
+### Сборка
 
-```env
-# Database
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/aiaggregator?sslmode=disable
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Server
-API_PORT=8080
+```bash
+go build ./...
 ```
+
+### Тесты
+
+```bash
+go test ./...
+```
+
+## 📦 Технологии
+
+| Компонент | Технология |
+|-----------|------------|
+| Backend | Go 1.24+ |
+| GraphQL | gqlgen |
+| Database | PostgreSQL 16 |
+| ORM | sqlc |
+| Queue | Redis + asynq |
+| Frontend | Next.js 14 (WIP) |
+
+## 📝 License
+
+MIT
 
 ---
 
