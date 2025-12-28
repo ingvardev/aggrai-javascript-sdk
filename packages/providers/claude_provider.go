@@ -60,21 +60,52 @@ func (p *ClaudeProvider) Type() string {
 
 // claudeRequest represents Claude API request.
 type claudeRequest struct {
-	Model     string          `json:"model"`
-	MaxTokens int             `json:"max_tokens"`
-	Messages  []claudeMessage `json:"messages"`
+	Model      string                 `json:"model"`
+	MaxTokens  int                    `json:"max_tokens"`
+	Messages   []claudeMessage        `json:"messages"`
+	Tools      []claudeTool           `json:"tools,omitempty"`
+	ToolChoice *claudeToolChoice      `json:"tool_choice,omitempty"`
 }
 
+// claudeMessage represents a message in Claude API format.
 type claudeMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string               `json:"role"`
+	Content interface{}          `json:"content"` // string or []claudeContentBlock
+}
+
+// claudeContentBlock represents a content block in Claude messages.
+type claudeContentBlock struct {
+	Type       string `json:"type"` // "text", "tool_use", "tool_result"
+	Text       string `json:"text,omitempty"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Input      interface{} `json:"input,omitempty"`
+	ToolUseID  string `json:"tool_use_id,omitempty"`
+	Content    string `json:"content,omitempty"`
+}
+
+// claudeTool represents a tool definition for Claude.
+type claudeTool struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	InputSchema map[string]interface{} `json:"input_schema"`
+}
+
+// claudeToolChoice specifies tool selection behavior.
+type claudeToolChoice struct {
+	Type string `json:"type"` // "auto", "any", "tool"
+	Name string `json:"name,omitempty"` // For "tool" type
 }
 
 type claudeResponse struct {
 	Content []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type  string `json:"type"`
+		Text  string `json:"text,omitempty"`
+		ID    string `json:"id,omitempty"`
+		Name  string `json:"name,omitempty"`
+		Input interface{} `json:"input,omitempty"`
 	} `json:"content"`
+	StopReason string `json:"stop_reason"`
 	Usage struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
@@ -88,12 +119,55 @@ func (p *ClaudeProvider) Complete(ctx context.Context, request *usecases.Complet
 		maxTokens = 2048
 	}
 
-	reqBody := claudeRequest{
-		Model:     p.model,
-		MaxTokens: maxTokens,
-		Messages: []claudeMessage{
+	// Use model from request if provided
+	model := request.Model
+	if model == "" {
+		model = p.model
+	}
+
+	// Build messages from request
+	var messages []claudeMessage
+	if len(request.Messages) > 0 {
+		for _, msg := range request.Messages {
+			claudeMsg := p.convertToClaudeMessage(msg)
+			messages = append(messages, claudeMsg)
+		}
+	} else {
+		messages = []claudeMessage{
 			{Role: "user", Content: request.Prompt},
-		},
+		}
+	}
+
+	reqBody := claudeRequest{
+		Model:     model,
+		MaxTokens: maxTokens,
+		Messages:  messages,
+	}
+
+	// Add tools if provided
+	if len(request.Tools) > 0 {
+		for _, tool := range request.Tools {
+			reqBody.Tools = append(reqBody.Tools, claudeTool{
+				Name:        tool.Function.Name,
+				Description: tool.Function.Description,
+				InputSchema: tool.Function.Parameters,
+			})
+		}
+		// Set tool_choice if specified
+		if request.ToolChoice != "" {
+			switch request.ToolChoice {
+			case "auto":
+				reqBody.ToolChoice = &claudeToolChoice{Type: "auto"}
+			case "none":
+				// Claude doesn't have "none" - just don't send tools
+				reqBody.Tools = nil
+			case "required":
+				reqBody.ToolChoice = &claudeToolChoice{Type: "any"}
+			default:
+				// Specific tool by name
+				reqBody.ToolChoice = &claudeToolChoice{Type: "tool", Name: request.ToolChoice}
+			}
+		}
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -133,7 +207,7 @@ func (p *ClaudeProvider) Complete(ctx context.Context, request *usecases.Complet
 	// Calculate cost using pricing service or fallback to defaults
 	var totalCost float64
 	if p.pricingService != nil {
-		cost, err := p.pricingService.CalculateCost(ctx, "claude", p.model, claudeResp.Usage.InputTokens, claudeResp.Usage.OutputTokens)
+		cost, err := p.pricingService.CalculateCost(ctx, "claude", model, claudeResp.Usage.InputTokens, claudeResp.Usage.OutputTokens)
 		if err == nil {
 			totalCost = cost
 		}
@@ -145,13 +219,83 @@ func (p *ClaudeProvider) Complete(ctx context.Context, request *usecases.Complet
 		totalCost = inputCost + outputCost
 	}
 
-	return &usecases.CompletionResponse{
-		Content:   claudeResp.Content[0].Text,
-		Model:     p.model,
-		TokensIn:  claudeResp.Usage.InputTokens,
-		TokensOut: claudeResp.Usage.OutputTokens,
-		Cost:      totalCost,
-	}, nil
+	// Build response
+	response := &usecases.CompletionResponse{
+		Model:        model,
+		TokensIn:     claudeResp.Usage.InputTokens,
+		TokensOut:    claudeResp.Usage.OutputTokens,
+		Cost:         totalCost,
+		FinishReason: claudeResp.StopReason,
+	}
+
+	// Extract text content and tool calls
+	for _, block := range claudeResp.Content {
+		switch block.Type {
+		case "text":
+			response.Content += block.Text
+		case "tool_use":
+			// Convert input to JSON string
+			inputJSON, _ := json.Marshal(block.Input)
+			response.ToolCalls = append(response.ToolCalls, usecases.ToolCall{
+				ID:   block.ID,
+				Type: "function",
+				Function: usecases.ToolCallFunction{
+					Name:      block.Name,
+					Arguments: string(inputJSON),
+				},
+			})
+		}
+	}
+
+	return response, nil
+}
+
+// convertToClaudeMessage converts a usecases.ChatMessage to Claude format.
+func (p *ClaudeProvider) convertToClaudeMessage(msg usecases.ChatMessage) claudeMessage {
+	// Handle tool response messages
+	if msg.Role == "tool" {
+		return claudeMessage{
+			Role: "user",
+			Content: []claudeContentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: msg.ToolCallID,
+					Content:   msg.Content,
+				},
+			},
+		}
+	}
+
+	// Handle assistant messages with tool calls
+	if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+		var blocks []claudeContentBlock
+		if msg.Content != "" {
+			blocks = append(blocks, claudeContentBlock{
+				Type: "text",
+				Text: msg.Content,
+			})
+		}
+		for _, tc := range msg.ToolCalls {
+			var input interface{}
+			json.Unmarshal([]byte(tc.Function.Arguments), &input)
+			blocks = append(blocks, claudeContentBlock{
+				Type:  "tool_use",
+				ID:    tc.ID,
+				Name:  tc.Function.Name,
+				Input: input,
+			})
+		}
+		return claudeMessage{
+			Role:    "assistant",
+			Content: blocks,
+		}
+	}
+
+	// Simple text message
+	return claudeMessage{
+		Role:    msg.Role,
+		Content: msg.Content,
+	}
 }
 
 // GenerateImage is not supported by Claude.
@@ -219,10 +363,12 @@ func (p *ClaudeProvider) ListModels(ctx context.Context) ([]usecases.ModelInfo, 
 
 // claudeStreamRequest represents a streaming message request to Claude API.
 type claudeStreamRequest struct {
-	Model     string               `json:"model"`
-	MaxTokens int                  `json:"max_tokens"`
-	Messages  []claudeMessage      `json:"messages"`
-	Stream    bool                 `json:"stream"`
+	Model      string               `json:"model"`
+	MaxTokens  int                  `json:"max_tokens"`
+	Messages   []claudeMessage      `json:"messages"`
+	Stream     bool                 `json:"stream"`
+	Tools      []claudeTool         `json:"tools,omitempty"`
+	ToolChoice *claudeToolChoice    `json:"tool_choice,omitempty"`
 }
 
 // claudeStreamEvent represents an SSE event from Claude.
@@ -230,12 +376,17 @@ type claudeStreamEvent struct {
 	Type         string `json:"type"`
 	Index        int    `json:"index,omitempty"`
 	ContentBlock *struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type  string      `json:"type"`
+		Text  string      `json:"text,omitempty"`
+		ID    string      `json:"id,omitempty"`
+		Name  string      `json:"name,omitempty"`
+		Input interface{} `json:"input,omitempty"`
 	} `json:"content_block,omitempty"`
 	Delta *struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type        string `json:"type"`
+		Text        string `json:"text,omitempty"`
+		PartialJSON string `json:"partial_json,omitempty"`
+		StopReason  string `json:"stop_reason,omitempty"`
 	} `json:"delta,omitempty"`
 	Message *struct {
 		Usage struct {
@@ -261,13 +412,46 @@ func (p *ClaudeProvider) CompleteStream(ctx context.Context, request *usecases.C
 		model = p.model
 	}
 
+	// Build messages from request
+	var messages []claudeMessage
+	if len(request.Messages) > 0 {
+		for _, msg := range request.Messages {
+			messages = append(messages, p.convertToClaudeMessage(msg))
+		}
+	} else {
+		messages = []claudeMessage{
+			{Role: "user", Content: request.Prompt},
+		}
+	}
+
 	reqBody := claudeStreamRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
-		Messages: []claudeMessage{
-			{Role: "user", Content: request.Prompt},
-		},
-		Stream: true,
+		Messages:  messages,
+		Stream:    true,
+	}
+
+	// Add tools if provided
+	if len(request.Tools) > 0 {
+		for _, tool := range request.Tools {
+			reqBody.Tools = append(reqBody.Tools, claudeTool{
+				Name:        tool.Function.Name,
+				Description: tool.Function.Description,
+				InputSchema: tool.Function.Parameters,
+			})
+		}
+		if request.ToolChoice != "" {
+			switch request.ToolChoice {
+			case "auto":
+				reqBody.ToolChoice = &claudeToolChoice{Type: "auto"}
+			case "none":
+				reqBody.Tools = nil
+			case "required":
+				reqBody.ToolChoice = &claudeToolChoice{Type: "any"}
+			default:
+				reqBody.ToolChoice = &claudeToolChoice{Type: "tool", Name: request.ToolChoice}
+			}
+		}
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -298,6 +482,9 @@ func (p *ClaudeProvider) CompleteStream(ctx context.Context, request *usecases.C
 
 	var fullContent string
 	var tokensIn, tokensOut int
+	var finishReason string
+	toolCalls := make(map[int]*usecases.ToolCall) // indexed by content block index
+	toolInputBuffers := make(map[int]string)       // buffer for streaming JSON input
 
 	// Read SSE stream
 	buf := make([]byte, 4096)
@@ -348,10 +535,31 @@ func (p *ClaudeProvider) CompleteStream(ctx context.Context, request *usecases.C
 			}
 
 			switch event.Type {
+			case "content_block_start":
+				if event.ContentBlock != nil && event.ContentBlock.Type == "tool_use" {
+					toolCalls[event.Index] = &usecases.ToolCall{
+						ID:   event.ContentBlock.ID,
+						Type: "function",
+						Function: usecases.ToolCallFunction{
+							Name: event.ContentBlock.Name,
+						},
+					}
+					toolInputBuffers[event.Index] = ""
+				}
 			case "content_block_delta":
-				if event.Delta != nil && event.Delta.Text != "" {
-					fullContent += event.Delta.Text
-					onChunk(event.Delta.Text)
+				if event.Delta != nil {
+					if event.Delta.Text != "" {
+						fullContent += event.Delta.Text
+						onChunk(event.Delta.Text)
+					}
+					if event.Delta.PartialJSON != "" {
+						toolInputBuffers[event.Index] += event.Delta.PartialJSON
+					}
+				}
+			case "content_block_stop":
+				// Finalize tool call input
+				if tc, ok := toolCalls[event.Index]; ok {
+					tc.Function.Arguments = toolInputBuffers[event.Index]
 				}
 			case "message_start":
 				if event.Message != nil {
@@ -360,6 +568,9 @@ func (p *ClaudeProvider) CompleteStream(ctx context.Context, request *usecases.C
 			case "message_delta":
 				if event.Usage != nil {
 					tokensOut = event.Usage.OutputTokens
+				}
+				if event.Delta != nil && event.Delta.StopReason != "" {
+					finishReason = event.Delta.StopReason
 				}
 			case "message_stop":
 				// Stream complete
@@ -389,11 +600,22 @@ func (p *ClaudeProvider) CompleteStream(ctx context.Context, request *usecases.C
 		totalCost = inputCost + outputCost
 	}
 
-	return &usecases.CompletionResponse{
-		Content:   fullContent,
-		Model:     model,
-		TokensIn:  tokensIn,
-		TokensOut: tokensOut,
-		Cost:      totalCost,
-	}, nil
+	// Build response
+	response := &usecases.CompletionResponse{
+		Content:      fullContent,
+		Model:        model,
+		TokensIn:     tokensIn,
+		TokensOut:    tokensOut,
+		Cost:         totalCost,
+		FinishReason: finishReason,
+	}
+
+	// Convert tool calls map to slice (ordered by index)
+	for i := 0; i < len(toolCalls); i++ {
+		if tc, ok := toolCalls[i]; ok {
+			response.ToolCalls = append(response.ToolCalls, *tc)
+		}
+	}
+
+	return response, nil
 }

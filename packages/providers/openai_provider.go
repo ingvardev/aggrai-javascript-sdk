@@ -65,19 +65,49 @@ type openAIChatRequest struct {
 	Messages            []openAIChatMessage `json:"messages"`
 	MaxTokens           int                 `json:"max_tokens,omitempty"`
 	MaxCompletionTokens int                 `json:"max_completion_tokens,omitempty"`
+	Tools               []openAITool        `json:"tools,omitempty"`
+	ToolChoice          interface{}         `json:"tool_choice,omitempty"`
 }
 
 type openAIChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string           `json:"role"`
+	Content    string           `json:"content,omitempty"`
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+	Name       string           `json:"name,omitempty"`
+}
+
+// openAITool represents a tool definition for OpenAI.
+type openAITool struct {
+	Type     string             `json:"type"`
+	Function openAIToolFunction `json:"function"`
+}
+
+// openAIToolFunction describes a function for OpenAI.
+type openAIToolFunction struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+}
+
+// openAIToolCall represents a tool call in OpenAI response.
+type openAIToolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
 }
 
 type openAIChatResponse struct {
 	ID      string `json:"id"`
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string           `json:"content"`
+			ToolCalls []openAIToolCall `json:"tool_calls,omitempty"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -93,11 +123,69 @@ func (p *OpenAIProvider) Complete(ctx context.Context, request *usecases.Complet
 		model = p.model
 	}
 
-	reqBody := openAIChatRequest{
-		Model: model,
-		Messages: []openAIChatMessage{
+	// Build messages from request
+	var messages []openAIChatMessage
+	if len(request.Messages) > 0 {
+		// Use provided messages (for multi-turn with tool calls)
+		for _, msg := range request.Messages {
+			oaiMsg := openAIChatMessage{
+				Role:       msg.Role,
+				Content:    msg.Content,
+				Name:       msg.Name,
+				ToolCallID: msg.ToolCallID,
+			}
+			// Convert tool calls if present
+			for _, tc := range msg.ToolCalls {
+				oaiMsg.ToolCalls = append(oaiMsg.ToolCalls, openAIToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					}{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+			messages = append(messages, oaiMsg)
+		}
+	} else {
+		// Single prompt mode
+		messages = []openAIChatMessage{
 			{Role: "user", Content: request.Prompt},
-		},
+		}
+	}
+
+	reqBody := openAIChatRequest{
+		Model:    model,
+		Messages: messages,
+	}
+
+	// Add tools if provided
+	if len(request.Tools) > 0 {
+		for _, tool := range request.Tools {
+			reqBody.Tools = append(reqBody.Tools, openAITool{
+				Type: tool.Type,
+				Function: openAIToolFunction{
+					Name:        tool.Function.Name,
+					Description: tool.Function.Description,
+					Parameters:  tool.Function.Parameters,
+				},
+			})
+		}
+		// Set tool_choice if specified
+		if request.ToolChoice != "" {
+			if request.ToolChoice == "auto" || request.ToolChoice == "none" || request.ToolChoice == "required" {
+				reqBody.ToolChoice = request.ToolChoice
+			} else {
+				// Specific tool by name
+				reqBody.ToolChoice = map[string]interface{}{
+					"type":     "function",
+					"function": map[string]string{"name": request.ToolChoice},
+				}
+			}
+		}
 	}
 
 	// o1/o3 models use max_completion_tokens instead of max_tokens
@@ -157,13 +245,29 @@ func (p *OpenAIProvider) Complete(ctx context.Context, request *usecases.Complet
 		totalCost = calculateOpenAIFallbackCost(model, openAIResp.Usage.PromptTokens, openAIResp.Usage.CompletionTokens)
 	}
 
-	return &usecases.CompletionResponse{
-		Content:   openAIResp.Choices[0].Message.Content,
-		Model:     p.model,
-		TokensIn:  openAIResp.Usage.PromptTokens,
-		TokensOut: openAIResp.Usage.CompletionTokens,
-		Cost:      totalCost,
-	}, nil
+	// Build response with tool calls if present
+	response := &usecases.CompletionResponse{
+		Content:      openAIResp.Choices[0].Message.Content,
+		Model:        model,
+		TokensIn:     openAIResp.Usage.PromptTokens,
+		TokensOut:    openAIResp.Usage.CompletionTokens,
+		Cost:         totalCost,
+		FinishReason: openAIResp.Choices[0].FinishReason,
+	}
+
+	// Convert tool calls from response
+	for _, tc := range openAIResp.Choices[0].Message.ToolCalls {
+		response.ToolCalls = append(response.ToolCalls, usecases.ToolCall{
+			ID:   tc.ID,
+			Type: tc.Type,
+			Function: usecases.ToolCallFunction{
+				Name:      tc.Function.Name,
+				Arguments: tc.Function.Arguments,
+			},
+		})
+	}
+
+	return response, nil
 }
 
 // GenerateImage generates an image from a prompt.
@@ -393,6 +497,8 @@ type openAIStreamRequest struct {
 	MaxCompletionTokens int                 `json:"max_completion_tokens,omitempty"`
 	Stream              bool                `json:"stream"`
 	StreamOptions       *streamOptions      `json:"stream_options,omitempty"`
+	Tools               []openAITool        `json:"tools,omitempty"`
+	ToolChoice          interface{}         `json:"tool_choice,omitempty"`
 }
 
 type streamOptions struct {
@@ -415,7 +521,16 @@ type openAIStreamChunk struct {
 	ID      string `json:"id"`
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id,omitempty"`
+				Type     string `json:"type,omitempty"`
+				Function struct {
+					Name      string `json:"name,omitempty"`
+					Arguments string `json:"arguments,omitempty"`
+				} `json:"function"`
+			} `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
@@ -433,15 +548,68 @@ func (p *OpenAIProvider) CompleteStream(ctx context.Context, request *usecases.C
 		model = p.model
 	}
 
-	reqBody := openAIStreamRequest{
-		Model: model,
-		Messages: []openAIChatMessage{
+	// Build messages from request
+	var messages []openAIChatMessage
+	if len(request.Messages) > 0 {
+		for _, msg := range request.Messages {
+			oaiMsg := openAIChatMessage{
+				Role:       msg.Role,
+				Content:    msg.Content,
+				Name:       msg.Name,
+				ToolCallID: msg.ToolCallID,
+			}
+			for _, tc := range msg.ToolCalls {
+				oaiMsg.ToolCalls = append(oaiMsg.ToolCalls, openAIToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					}{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+			messages = append(messages, oaiMsg)
+		}
+	} else {
+		messages = []openAIChatMessage{
 			{Role: "user", Content: request.Prompt},
-		},
-		Stream: true,
+		}
+	}
+
+	reqBody := openAIStreamRequest{
+		Model:    model,
+		Messages: messages,
+		Stream:   true,
 		StreamOptions: &streamOptions{
 			IncludeUsage: true,
 		},
+	}
+
+	// Add tools if provided
+	if len(request.Tools) > 0 {
+		for _, tool := range request.Tools {
+			reqBody.Tools = append(reqBody.Tools, openAITool{
+				Type: tool.Type,
+				Function: openAIToolFunction{
+					Name:        tool.Function.Name,
+					Description: tool.Function.Description,
+					Parameters:  tool.Function.Parameters,
+				},
+			})
+		}
+		if request.ToolChoice != "" {
+			if request.ToolChoice == "auto" || request.ToolChoice == "none" || request.ToolChoice == "required" {
+				reqBody.ToolChoice = request.ToolChoice
+			} else {
+				reqBody.ToolChoice = map[string]interface{}{
+					"type":     "function",
+					"function": map[string]string{"name": request.ToolChoice},
+				}
+			}
+		}
 	}
 
 	// o1/o3 models use max_completion_tokens instead of max_tokens
@@ -482,6 +650,8 @@ func (p *OpenAIProvider) CompleteStream(ctx context.Context, request *usecases.C
 
 	var fullContent string
 	var tokensIn, tokensOut int
+	var finishReason string
+	toolCalls := make(map[int]*usecases.ToolCall) // indexed by tool call index
 
 	// Read SSE stream
 	reader := resp.Body
@@ -535,10 +705,34 @@ func (p *OpenAIProvider) CompleteStream(ctx context.Context, request *usecases.C
 				continue
 			}
 
-			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-				content := chunk.Choices[0].Delta.Content
-				fullContent += content
-				onChunk(content)
+			if len(chunk.Choices) > 0 {
+				choice := chunk.Choices[0]
+
+				// Handle text content
+				if choice.Delta.Content != "" {
+					fullContent += choice.Delta.Content
+					onChunk(choice.Delta.Content)
+				}
+
+				// Handle tool calls (streamed incrementally)
+				for _, tc := range choice.Delta.ToolCalls {
+					if _, exists := toolCalls[tc.Index]; !exists {
+						toolCalls[tc.Index] = &usecases.ToolCall{
+							ID:   tc.ID,
+							Type: tc.Type,
+							Function: usecases.ToolCallFunction{
+								Name: tc.Function.Name,
+							},
+						}
+					}
+					// Append arguments as they stream in
+					toolCalls[tc.Index].Function.Arguments += tc.Function.Arguments
+				}
+
+				// Capture finish reason
+				if choice.FinishReason != nil {
+					finishReason = *choice.FinishReason
+				}
 			}
 
 			// OpenAI returns usage in the final chunk with stream_options
@@ -566,16 +760,25 @@ func (p *OpenAIProvider) CompleteStream(ctx context.Context, request *usecases.C
 		}
 	}
 	if totalCost == 0 {
-		inputCost := float64(tokensIn) * 0.00000015
-		outputCost := float64(tokensOut) * 0.0000006
-		totalCost = inputCost + outputCost
+		totalCost = calculateOpenAIFallbackCost(model, tokensIn, tokensOut)
 	}
 
-	return &usecases.CompletionResponse{
-		Content:   fullContent,
-		Model:     model,
-		TokensIn:  tokensIn,
-		TokensOut: tokensOut,
-		Cost:      totalCost,
-	}, nil
+	// Build response
+	response := &usecases.CompletionResponse{
+		Content:      fullContent,
+		Model:        model,
+		TokensIn:     tokensIn,
+		TokensOut:    tokensOut,
+		Cost:         totalCost,
+		FinishReason: finishReason,
+	}
+
+	// Convert tool calls map to slice
+	for i := 0; i < len(toolCalls); i++ {
+		if tc, ok := toolCalls[i]; ok {
+			response.ToolCalls = append(response.ToolCalls, *tc)
+		}
+	}
+
+	return response, nil
 }

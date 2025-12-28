@@ -4,12 +4,14 @@
 
 AI Aggregator is a unified API platform for running requests across multiple AI providers (OpenAI, Claude, Ollama). It provides:
 - **SSE Streaming** — real-time text generation
+- **Tools/Functions** — AI function calling support for OpenAI and Claude
 - **Async job processing** — background task queue via Redis/asynq
 - **Provider abstraction** — unified interface for all AI providers
 - **Dynamic model selection** — fetch available models from provider APIs
 - **Usage tracking** — tokens, cost by provider and tenant
 - **Pricing configuration** — customizable per-model pricing
 - **Multi-language UI** — English/Russian with i18next
+- **Health checks** — Kubernetes-ready liveness/readiness probes
 - **API key authentication** — multi-tenant support
 
 ## Architecture
@@ -24,10 +26,11 @@ apps/
 
 packages/
 ├── domain/       # Core entities (Job, Tenant, Usage, Provider, Pricing)
-├── usecases/     # Business logic services
+├── usecases/     # Business logic services and interfaces
 ├── providers/    # AI provider implementations (OpenAI, Claude, Ollama)
 ├── adapters/     # Repository implementations (PostgreSQL, in-memory)
 ├── queue/        # Job queue (asynq/Redis)
+├── pubsub/       # Redis pub/sub for real-time updates
 └── shared/       # Config, logging utilities
 
 infrastructure/
@@ -110,12 +113,82 @@ type ModelListProvider interface {
     ListModels(ctx context.Context) ([]ModelInfo, error)
 }
 
+// ToolsProvider - for function/tool calling (OpenAI, Claude)
+type ToolsProvider interface {
+    StreamingProvider
+    Complete(ctx context.Context, request *CompletionRequest) (*CompletionResponse, error)
+}
+
 // JobRepository - job persistence
 type JobRepository interface {
     Create(ctx context.Context, job *domain.Job) error
     GetByID(ctx context.Context, id uuid.UUID) (*domain.Job, error)
     Update(ctx context.Context, job *domain.Job) error
     // ...
+}
+```
+
+## Tools/Functions API
+
+OpenAI and Claude providers support function calling:
+
+```go
+// Define tools
+tools := []usecases.Tool{
+    {
+        Type: "function",
+        Function: usecases.ToolFunction{
+            Name:        "get_weather",
+            Description: "Get weather for a location",
+            Parameters: map[string]interface{}{
+                "type": "object",
+                "properties": map[string]interface{}{
+                    "location": map[string]interface{}{"type": "string"},
+                },
+                "required": []string{"location"},
+            },
+        },
+    },
+}
+
+// Send request with tools
+resp, _ := provider.Complete(ctx, &usecases.CompletionRequest{
+    Messages: []usecases.ChatMessage{
+        {Role: "user", Content: "What's the weather in Paris?"},
+    },
+    Tools:      tools,
+    ToolChoice: "auto", // "auto", "none", "required", or function name
+})
+
+// Handle tool calls
+if resp.FinishReason == "tool_calls" {
+    for _, tc := range resp.ToolCalls {
+        // tc.Function.Name = "get_weather"
+        // tc.Function.Arguments = `{"location": "Paris"}`
+    }
+}
+```
+
+## Health Check Endpoints
+
+Production-ready health checks:
+
+| Endpoint | Purpose | Kubernetes Probe |
+|----------|---------|------------------|
+| `/healthz` | Liveness — process is running | `livenessProbe` |
+| `/readyz` | Readiness — dependencies available | `readinessProbe` |
+| `/health` | Full status with latency metrics | Monitoring |
+
+Response example:
+```json
+{
+  "status": "healthy",
+  "service": "ai-aggregator-api",
+  "version": "0.1.0",
+  "checks": {
+    "postgres": {"status": "healthy", "latency": "1.2ms"},
+    "redis": {"status": "healthy", "latency": "0.5ms"}
+  }
 }
 ```
 
@@ -136,6 +209,7 @@ OLLAMA_URL=http://localhost:11434
 # Server
 API_PORT=8080
 ENABLE_PLAYGROUND=true
+ENABLE_STUB_PROVIDER=false  # Enable stub provider for testing
 ```
 
 ## Common Tasks
@@ -145,8 +219,9 @@ ENABLE_PLAYGROUND=true
 2. Implement `usecases.AIProvider` interface
 3. Optionally implement `StreamingProvider` for SSE support
 4. Optionally implement `ModelListProvider` for dynamic models
-5. Register in `apps/api/cmd/server/main.go` and `apps/worker/cmd/worker/main.go`
-6. Add tests in `newprovider_provider_test.go`
+5. Optionally implement `ToolsProvider` for function calling
+6. Register in `apps/api/cmd/server/main.go` and `apps/worker/cmd/worker/main.go`
+7. Add tests in `newprovider_provider_test.go`
 
 ### Add new GraphQL mutation/query
 1. Update `apps/api/internal/graph/schema.graphql`
@@ -156,7 +231,7 @@ ENABLE_PLAYGROUND=true
 ### Add new domain entity
 1. Create in `packages/domain/`
 2. Add repository interface in `packages/usecases/repositories.go`
-3. Implement in `packages/adapters/` (postgres.go, inmemory.go)
+3. Implement in `packages/adapters/` (postgres.go, memory.go)
 4. Add migration in `infrastructure/postgres/migrations/`
 
 ### Add translations
@@ -184,6 +259,12 @@ go run ./apps/worker/cmd/worker
 cd apps/web && pnpm dev
 ```
 
+### Check for dead code
+```bash
+go install golang.org/x/tools/cmd/deadcode@latest
+~/go/bin/deadcode -test ./...
+```
+
 ## API Examples
 
 ### GraphQL Playground
@@ -199,9 +280,28 @@ mutation {
 }
 ```
 
+### List Provider Models
+```graphql
+query {
+  providerModels(provider: "openai") {
+    id
+    name
+    description
+  }
+}
+```
+
 ### Headers
 ```
 X-API-Key: dev-api-key-12345
+```
+
+### SSE Streaming
+```bash
+curl -N "http://localhost:8080/stream?provider=openai&model=gpt-4o-mini" \
+  -H "X-API-Key: dev-api-key-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Hello!"}'
 ```
 
 ## Testing
@@ -233,3 +333,12 @@ docker compose up --build
 - Tests: `*_test.go` (job_service_test.go)
 - React: `PascalCase.tsx` (JobList.tsx, CreateJobDialog.tsx)
 - Styles: `kebab-case.css`
+
+## Provider Feature Matrix
+
+| Provider | Streaming | Models API | Tools/Functions |
+|----------|-----------|------------|-----------------|
+| OpenAI   | ✅        | ✅         | ✅              |
+| Claude   | ✅        | Static     | ✅              |
+| Ollama   | ✅        | ✅         | ❌              |
+| Stub     | ✅        | ❌         | ❌              |

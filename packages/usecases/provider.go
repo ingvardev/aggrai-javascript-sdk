@@ -37,6 +37,46 @@ type CompletionRequest struct {
 	Model     string
 	MaxTokens int
 	Options   map[string]interface{}
+
+	// Tools/Functions support
+	Messages     []ChatMessage  `json:"messages,omitempty"`
+	Tools        []Tool         `json:"tools,omitempty"`
+	ToolChoice   string         `json:"tool_choice,omitempty"` // "auto", "none", "required", or specific tool
+}
+
+// ChatMessage represents a message in a conversation.
+type ChatMessage struct {
+	Role       string     `json:"role"`                  // "system", "user", "assistant", "tool"
+	Content    string     `json:"content,omitempty"`
+	Name       string     `json:"name,omitempty"`        // For tool messages
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`  // For assistant messages with tool calls
+	ToolCallID string     `json:"tool_call_id,omitempty"` // For tool response messages
+}
+
+// Tool represents a tool/function that can be called by the AI.
+type Tool struct {
+	Type     string       `json:"type"` // "function"
+	Function ToolFunction `json:"function"`
+}
+
+// ToolFunction describes a function that can be called.
+type ToolFunction struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"` // JSON Schema
+}
+
+// ToolCall represents a tool call made by the assistant.
+type ToolCall struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"` // "function"
+	Function ToolCallFunction `json:"function"`
+}
+
+// ToolCallFunction contains the function call details.
+type ToolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"` // JSON string
 }
 
 // CompletionResponse represents a text completion response.
@@ -46,6 +86,10 @@ type CompletionResponse struct {
 	TokensIn  int
 	TokensOut int
 	Cost      float64
+
+	// Tools/Functions support
+	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
+	FinishReason string     `json:"finish_reason,omitempty"` // "stop", "tool_calls", "length"
 }
 
 // ImageRequest represents an image generation request.
@@ -75,12 +119,16 @@ type StreamingProvider interface {
 
 // StreamChunk represents a chunk of streaming response.
 type StreamChunk struct {
-	Content      string `json:"content"`
-	Done         bool   `json:"done"`
-	TokensIn     int    `json:"tokensIn,omitempty"`
-	TokensOut    int    `json:"tokensOut,omitempty"`
-	Cost         float64 `json:"cost,omitempty"`
-	Error        string `json:"error,omitempty"`
+	Content      string     `json:"content"`
+	Done         bool       `json:"done"`
+	TokensIn     int        `json:"tokensIn,omitempty"`
+	TokensOut    int        `json:"tokensOut,omitempty"`
+	Cost         float64    `json:"cost,omitempty"`
+	Error        string     `json:"error,omitempty"`
+
+	// Tools/Functions support
+	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
+	FinishReason string     `json:"finish_reason,omitempty"`
 }
 
 // ModelInfo represents information about an available model.
@@ -96,6 +144,14 @@ type ModelListProvider interface {
 	AIProvider
 	// ListModels returns a list of available models for this provider.
 	ListModels(ctx context.Context) ([]ModelInfo, error)
+}
+
+// ToolsProvider interface for providers that support function/tool calling.
+// Both OpenAI and Claude implement this through their Complete/CompleteStream methods.
+type ToolsProvider interface {
+	StreamingProvider
+	// Complete performs a completion with optional tools support.
+	Complete(ctx context.Context, request *CompletionRequest) (*CompletionResponse, error)
 }
 
 // ProviderSelector selects the best available provider for a request.
