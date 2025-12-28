@@ -7,7 +7,6 @@ package graph
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -70,6 +69,54 @@ func (r *mutationResolver) CancelJob(ctx context.Context, id string) (*Job, erro
 	return domainJobToGraphQL(job), nil
 }
 
+// UpdateTenant is the resolver for the updateTenant field.
+func (r *mutationResolver) UpdateTenant(ctx context.Context, input UpdateTenantInput) (*Tenant, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	// Apply updates
+	if input.Name != nil {
+		tenant.Name = *input.Name
+	}
+	if input.DefaultProvider != nil {
+		tenant.DefaultProvider = *input.DefaultProvider
+	}
+	if input.Settings != nil {
+		if input.Settings.DarkMode != nil {
+			tenant.Settings.DarkMode = *input.Settings.DarkMode
+		}
+		if input.Settings.Notifications != nil {
+			if input.Settings.Notifications.JobCompleted != nil {
+				tenant.Settings.Notifications.JobCompleted = *input.Settings.Notifications.JobCompleted
+			}
+			if input.Settings.Notifications.JobFailed != nil {
+				tenant.Settings.Notifications.JobFailed = *input.Settings.Notifications.JobFailed
+			}
+			if input.Settings.Notifications.ProviderOffline != nil {
+				tenant.Settings.Notifications.ProviderOffline = *input.Settings.Notifications.ProviderOffline
+			}
+			if input.Settings.Notifications.UsageThreshold != nil {
+				tenant.Settings.Notifications.UsageThreshold = *input.Settings.Notifications.UsageThreshold
+			}
+			if input.Settings.Notifications.WeeklySummary != nil {
+				tenant.Settings.Notifications.WeeklySummary = *input.Settings.Notifications.WeeklySummary
+			}
+			if input.Settings.Notifications.MarketingEmails != nil {
+				tenant.Settings.Notifications.MarketingEmails = *input.Settings.Notifications.MarketingEmails
+			}
+		}
+	}
+
+	// Save to database
+	if err := r.tenantRepo.Update(ctx, tenant); err != nil {
+		return nil, fmt.Errorf("failed to update tenant: %w", err)
+	}
+
+	return domainTenantToGraphQL(tenant), nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*Tenant, error) {
 	tenant := middleware.TenantFromContext(ctx)
@@ -77,13 +124,7 @@ func (r *queryResolver) Me(ctx context.Context) (*Tenant, error) {
 		return nil, fmt.Errorf("unauthorized")
 	}
 
-	return &Tenant{
-		ID:        tenant.ID.String(),
-		Name:      tenant.Name,
-		Active:    tenant.Active,
-		CreatedAt: tenant.CreatedAt,
-		UpdatedAt: tenant.UpdatedAt,
-	}, nil
+	return domainTenantToGraphQL(tenant), nil
 }
 
 // Job is the resolver for the job field.
@@ -269,49 +310,3 @@ func (r *Resolver) Subscription() SubscriptionResolver { return &subscriptionRes
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
-
-// Helper functions
-
-func domainJobToGraphQL(job *domain.Job) *Job {
-	var status JobStatus
-	switch job.Status {
-	case domain.JobStatusPending:
-		status = JobStatusPending
-	case domain.JobStatusProcessing:
-		status = JobStatusProcessing
-	case domain.JobStatusCompleted:
-		status = JobStatusCompleted
-	case domain.JobStatusFailed:
-		status = JobStatusFailed
-	}
-
-	var jobType JobType
-	switch job.Type {
-	case domain.JobTypeText:
-		jobType = JobTypeText
-	case domain.JobTypeImage:
-		jobType = JobTypeImage
-	}
-
-	return &Job{
-		ID:         job.ID.String(),
-		TenantID:   job.TenantID.String(),
-		Type:       jobType,
-		Input:      job.Input,
-		Status:     status,
-		Result:     job.Result,
-		Error:      job.Error,
-		Provider:   job.Provider,
-		TokensIn:   job.TokensIn,
-		TokensOut:  job.TokensOut,
-		Cost:       job.Cost,
-		CreatedAt:  job.CreatedAt,
-		UpdatedAt:  job.UpdatedAt,
-		StartedAt:  job.StartedAt,
-		FinishedAt: job.FinishedAt,
-	}
-}
-
-func encodeCursor(id string) string {
-	return base64.StdEncoding.EncodeToString([]byte(id))
-}

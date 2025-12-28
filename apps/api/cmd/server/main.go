@@ -183,7 +183,7 @@ func main() {
 	}
 
 	// GraphQL endpoint with auth middleware
-	graphResolver := graph.NewResolver(jobService, authService, providerRegistry)
+	graphResolver := graph.NewResolver(jobService, authService, tenantRepo, providerRegistry)
 	graphServer := graph.NewServer(graphResolver)
 
 	// Apply auth middleware for GraphQL

@@ -41,12 +41,14 @@ type Provider struct {
 }
 
 type Tenant struct {
-	ID        pgtype.UUID        `db:"id" json:"id"`
-	Name      string             `db:"name" json:"name"`
-	ApiKey    string             `db:"api_key" json:"api_key"`
-	Active    pgtype.Bool        `db:"active" json:"active"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID              pgtype.UUID        `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	ApiKey          string             `db:"api_key" json:"api_key"`
+	Active          pgtype.Bool        `db:"active" json:"active"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DefaultProvider pgtype.Text        `db:"default_provider" json:"default_provider"`
+	Settings        []byte             `db:"settings" json:"settings"`
 }
 
 type Usage struct {

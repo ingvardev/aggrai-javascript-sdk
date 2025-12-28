@@ -39,8 +39,25 @@ type Tenant {
   id: ID!
   name: String!
   active: Boolean!
+  defaultProvider: String
+  settings: TenantSettings
   createdAt: Time!
   updatedAt: Time!
+}
+
+# TenantSettings represents user preferences
+type TenantSettings {
+  darkMode: Boolean!
+  notifications: NotificationSettings!
+}
+
+type NotificationSettings {
+  jobCompleted: Boolean!
+  jobFailed: Boolean!
+  providerOffline: Boolean!
+  usageThreshold: Boolean!
+  weeklySummary: Boolean!
+  marketingEmails: Boolean!
 }
 
 # Provider represents an AI provider
@@ -105,6 +122,26 @@ input CreateJobInput {
   input: String!
 }
 
+input UpdateTenantInput {
+  name: String
+  defaultProvider: String
+  settings: TenantSettingsInput
+}
+
+input TenantSettingsInput {
+  darkMode: Boolean
+  notifications: NotificationSettingsInput
+}
+
+input NotificationSettingsInput {
+  jobCompleted: Boolean
+  jobFailed: Boolean
+  providerOffline: Boolean
+  usageThreshold: Boolean
+  weeklySummary: Boolean
+  marketingEmails: Boolean
+}
+
 input JobsFilter {
   status: JobStatus
   type: JobType
@@ -140,13 +177,16 @@ type Mutation {
 
   # Cancel a pending job
   cancelJob(id: ID!): Job
+
+  # Update current tenant settings
+  updateTenant(input: UpdateTenantInput!): Tenant!
 }
 
 # Subscriptions
 type Subscription {
   # Subscribe to all job updates for the current tenant
   jobUpdated: Job!
-  
+
   # Subscribe to updates for a specific job
   jobStatusChanged(jobId: ID!): Job!
 }

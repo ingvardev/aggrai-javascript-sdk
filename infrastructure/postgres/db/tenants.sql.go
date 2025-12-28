@@ -14,7 +14,7 @@ import (
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO tenants (name, api_key, active)
 VALUES ($1, $2, $3)
-RETURNING id, name, api_key, active, created_at, updated_at
+RETURNING id, name, api_key, active, created_at, updated_at, default_provider, settings
 `
 
 type CreateTenantParams struct {
@@ -33,6 +33,8 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Ten
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultProvider,
+		&i.Settings,
 	)
 	return i, err
 }
@@ -47,7 +49,7 @@ func (q *Queries) DeleteTenant(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getTenant = `-- name: GetTenant :one
-SELECT id, name, api_key, active, created_at, updated_at FROM tenants WHERE id = $1 LIMIT 1
+SELECT id, name, api_key, active, created_at, updated_at, default_provider, settings FROM tenants WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetTenant(ctx context.Context, id pgtype.UUID) (Tenant, error) {
@@ -60,12 +62,14 @@ func (q *Queries) GetTenant(ctx context.Context, id pgtype.UUID) (Tenant, error)
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultProvider,
+		&i.Settings,
 	)
 	return i, err
 }
 
 const getTenantByAPIKey = `-- name: GetTenantByAPIKey :one
-SELECT id, name, api_key, active, created_at, updated_at FROM tenants WHERE api_key = $1 AND active = true LIMIT 1
+SELECT id, name, api_key, active, created_at, updated_at, default_provider, settings FROM tenants WHERE api_key = $1 AND active = true LIMIT 1
 `
 
 func (q *Queries) GetTenantByAPIKey(ctx context.Context, apiKey string) (Tenant, error) {
@@ -78,12 +82,14 @@ func (q *Queries) GetTenantByAPIKey(ctx context.Context, apiKey string) (Tenant,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultProvider,
+		&i.Settings,
 	)
 	return i, err
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, name, api_key, active, created_at, updated_at FROM tenants ORDER BY created_at DESC LIMIT $1 OFFSET $2
+SELECT id, name, api_key, active, created_at, updated_at, default_provider, settings FROM tenants ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListTenantsParams struct {
@@ -107,6 +113,8 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Ten
 			&i.Active,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DefaultProvider,
+			&i.Settings,
 		); err != nil {
 			return nil, err
 		}
@@ -120,19 +128,27 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Ten
 
 const updateTenant = `-- name: UpdateTenant :one
 UPDATE tenants
-SET name = $2, active = $3, updated_at = NOW()
+SET name = $2, active = $3, default_provider = $4, settings = $5, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, api_key, active, created_at, updated_at
+RETURNING id, name, api_key, active, created_at, updated_at, default_provider, settings
 `
 
 type UpdateTenantParams struct {
-	ID     pgtype.UUID `db:"id" json:"id"`
-	Name   string      `db:"name" json:"name"`
-	Active pgtype.Bool `db:"active" json:"active"`
+	ID              pgtype.UUID `db:"id" json:"id"`
+	Name            string      `db:"name" json:"name"`
+	Active          pgtype.Bool `db:"active" json:"active"`
+	DefaultProvider pgtype.Text `db:"default_provider" json:"default_provider"`
+	Settings        []byte      `db:"settings" json:"settings"`
 }
 
 func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error) {
-	row := q.db.QueryRow(ctx, updateTenant, arg.ID, arg.Name, arg.Active)
+	row := q.db.QueryRow(ctx, updateTenant,
+		arg.ID,
+		arg.Name,
+		arg.Active,
+		arg.DefaultProvider,
+		arg.Settings,
+	)
 	var i Tenant
 	err := row.Scan(
 		&i.ID,
@@ -141,6 +157,8 @@ func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Ten
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultProvider,
+		&i.Settings,
 	)
 	return i, err
 }

@@ -77,8 +77,18 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CancelJob func(childComplexity int, id string) int
-		CreateJob func(childComplexity int, input CreateJobInput) int
+		CancelJob    func(childComplexity int, id string) int
+		CreateJob    func(childComplexity int, input CreateJobInput) int
+		UpdateTenant func(childComplexity int, input UpdateTenantInput) int
+	}
+
+	NotificationSettings struct {
+		JobCompleted    func(childComplexity int) int
+		JobFailed       func(childComplexity int) int
+		MarketingEmails func(childComplexity int) int
+		ProviderOffline func(childComplexity int) int
+		UsageThreshold  func(childComplexity int) int
+		WeeklySummary   func(childComplexity int) int
 	}
 
 	PageInfo struct {
@@ -109,11 +119,18 @@ type ComplexityRoot struct {
 	}
 
 	Tenant struct {
-		Active    func(childComplexity int) int
-		CreatedAt func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Name      func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
+		Active          func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		DefaultProvider func(childComplexity int) int
+		ID              func(childComplexity int) int
+		Name            func(childComplexity int) int
+		Settings        func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
+	}
+
+	TenantSettings struct {
+		DarkMode      func(childComplexity int) int
+		Notifications func(childComplexity int) int
 	}
 
 	Usage struct {
@@ -140,6 +157,7 @@ type ComplexityRoot struct {
 type MutationResolver interface {
 	CreateJob(ctx context.Context, input CreateJobInput) (*Job, error)
 	CancelJob(ctx context.Context, id string) (*Job, error)
+	UpdateTenant(ctx context.Context, input UpdateTenantInput) (*Tenant, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*Tenant, error)
@@ -311,6 +329,54 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreateJob(childComplexity, args["input"].(CreateJobInput)), true
+	case "Mutation.updateTenant":
+		if e.complexity.Mutation.UpdateTenant == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateTenant_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateTenant(childComplexity, args["input"].(UpdateTenantInput)), true
+
+	case "NotificationSettings.jobCompleted":
+		if e.complexity.NotificationSettings.JobCompleted == nil {
+			break
+		}
+
+		return e.complexity.NotificationSettings.JobCompleted(childComplexity), true
+	case "NotificationSettings.jobFailed":
+		if e.complexity.NotificationSettings.JobFailed == nil {
+			break
+		}
+
+		return e.complexity.NotificationSettings.JobFailed(childComplexity), true
+	case "NotificationSettings.marketingEmails":
+		if e.complexity.NotificationSettings.MarketingEmails == nil {
+			break
+		}
+
+		return e.complexity.NotificationSettings.MarketingEmails(childComplexity), true
+	case "NotificationSettings.providerOffline":
+		if e.complexity.NotificationSettings.ProviderOffline == nil {
+			break
+		}
+
+		return e.complexity.NotificationSettings.ProviderOffline(childComplexity), true
+	case "NotificationSettings.usageThreshold":
+		if e.complexity.NotificationSettings.UsageThreshold == nil {
+			break
+		}
+
+		return e.complexity.NotificationSettings.UsageThreshold(childComplexity), true
+	case "NotificationSettings.weeklySummary":
+		if e.complexity.NotificationSettings.WeeklySummary == nil {
+			break
+		}
+
+		return e.complexity.NotificationSettings.WeeklySummary(childComplexity), true
 
 	case "PageInfo.hasNextPage":
 		if e.complexity.PageInfo.HasNextPage == nil {
@@ -433,6 +499,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Tenant.CreatedAt(childComplexity), true
+	case "Tenant.defaultProvider":
+		if e.complexity.Tenant.DefaultProvider == nil {
+			break
+		}
+
+		return e.complexity.Tenant.DefaultProvider(childComplexity), true
 	case "Tenant.id":
 		if e.complexity.Tenant.ID == nil {
 			break
@@ -445,12 +517,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Tenant.Name(childComplexity), true
+	case "Tenant.settings":
+		if e.complexity.Tenant.Settings == nil {
+			break
+		}
+
+		return e.complexity.Tenant.Settings(childComplexity), true
 	case "Tenant.updatedAt":
 		if e.complexity.Tenant.UpdatedAt == nil {
 			break
 		}
 
 		return e.complexity.Tenant.UpdatedAt(childComplexity), true
+
+	case "TenantSettings.darkMode":
+		if e.complexity.TenantSettings.DarkMode == nil {
+			break
+		}
+
+		return e.complexity.TenantSettings.DarkMode(childComplexity), true
+	case "TenantSettings.notifications":
+		if e.complexity.TenantSettings.Notifications == nil {
+			break
+		}
+
+		return e.complexity.TenantSettings.Notifications(childComplexity), true
 
 	case "Usage.cost":
 		if e.complexity.Usage.Cost == nil {
@@ -548,7 +639,10 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCreateJobInput,
 		ec.unmarshalInputJobsFilter,
+		ec.unmarshalInputNotificationSettingsInput,
 		ec.unmarshalInputPaginationInput,
+		ec.unmarshalInputTenantSettingsInput,
+		ec.unmarshalInputUpdateTenantInput,
 	)
 	first := true
 
@@ -697,6 +791,17 @@ func (ec *executionContext) field_Mutation_createJob_args(ctx context.Context, r
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNCreateJobInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreateJobInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateTenant_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateTenantInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdateTenantInput)
 	if err != nil {
 		return nil, err
 	}
@@ -1548,6 +1653,237 @@ func (ec *executionContext) fieldContext_Mutation_cancelJob(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_updateTenant(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateTenant,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdateTenant(ctx, fc.Args["input"].(UpdateTenantInput))
+		},
+		nil,
+		ec.marshalNTenant2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenant,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateTenant(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Tenant_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Tenant_name(ctx, field)
+			case "active":
+				return ec.fieldContext_Tenant_active(ctx, field)
+			case "defaultProvider":
+				return ec.fieldContext_Tenant_defaultProvider(ctx, field)
+			case "settings":
+				return ec.fieldContext_Tenant_settings(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Tenant_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Tenant_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Tenant", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateTenant_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NotificationSettings_jobCompleted(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NotificationSettings_jobCompleted,
+		func(ctx context.Context) (any, error) {
+			return obj.JobCompleted, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NotificationSettings_jobCompleted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NotificationSettings_jobFailed(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NotificationSettings_jobFailed,
+		func(ctx context.Context) (any, error) {
+			return obj.JobFailed, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NotificationSettings_jobFailed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NotificationSettings_providerOffline(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NotificationSettings_providerOffline,
+		func(ctx context.Context) (any, error) {
+			return obj.ProviderOffline, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NotificationSettings_providerOffline(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NotificationSettings_usageThreshold(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NotificationSettings_usageThreshold,
+		func(ctx context.Context) (any, error) {
+			return obj.UsageThreshold, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NotificationSettings_usageThreshold(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NotificationSettings_weeklySummary(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NotificationSettings_weeklySummary,
+		func(ctx context.Context) (any, error) {
+			return obj.WeeklySummary, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NotificationSettings_weeklySummary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NotificationSettings_marketingEmails(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NotificationSettings_marketingEmails,
+		func(ctx context.Context) (any, error) {
+			return obj.MarketingEmails, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NotificationSettings_marketingEmails(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NotificationSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_totalCount(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1810,6 +2146,10 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Tenant_name(ctx, field)
 			case "active":
 				return ec.fieldContext_Tenant_active(ctx, field)
+			case "defaultProvider":
+				return ec.fieldContext_Tenant_defaultProvider(ctx, field)
+			case "settings":
+				return ec.fieldContext_Tenant_settings(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Tenant_createdAt(ctx, field)
 			case "updatedAt":
@@ -2352,6 +2692,70 @@ func (ec *executionContext) fieldContext_Tenant_active(_ context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _Tenant_defaultProvider(ctx context.Context, field graphql.CollectedField, obj *Tenant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Tenant_defaultProvider,
+		func(ctx context.Context) (any, error) {
+			return obj.DefaultProvider, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Tenant_defaultProvider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Tenant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Tenant_settings(ctx context.Context, field graphql.CollectedField, obj *Tenant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Tenant_settings,
+		func(ctx context.Context) (any, error) {
+			return obj.Settings, nil
+		},
+		nil,
+		ec.marshalOTenantSettings2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantSettings,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Tenant_settings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Tenant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "darkMode":
+				return ec.fieldContext_TenantSettings_darkMode(ctx, field)
+			case "notifications":
+				return ec.fieldContext_TenantSettings_notifications(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TenantSettings", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Tenant_createdAt(ctx context.Context, field graphql.CollectedField, obj *Tenant) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2405,6 +2809,78 @@ func (ec *executionContext) fieldContext_Tenant_updatedAt(_ context.Context, fie
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantSettings_darkMode(ctx context.Context, field graphql.CollectedField, obj *TenantSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantSettings_darkMode,
+		func(ctx context.Context) (any, error) {
+			return obj.DarkMode, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantSettings_darkMode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantSettings_notifications(ctx context.Context, field graphql.CollectedField, obj *TenantSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantSettings_notifications,
+		func(ctx context.Context) (any, error) {
+			return obj.Notifications, nil
+		},
+		nil,
+		ec.marshalNNotificationSettings2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐNotificationSettings,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantSettings_notifications(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "jobCompleted":
+				return ec.fieldContext_NotificationSettings_jobCompleted(ctx, field)
+			case "jobFailed":
+				return ec.fieldContext_NotificationSettings_jobFailed(ctx, field)
+			case "providerOffline":
+				return ec.fieldContext_NotificationSettings_providerOffline(ctx, field)
+			case "usageThreshold":
+				return ec.fieldContext_NotificationSettings_usageThreshold(ctx, field)
+			case "weeklySummary":
+				return ec.fieldContext_NotificationSettings_weeklySummary(ctx, field)
+			case "marketingEmails":
+				return ec.fieldContext_NotificationSettings_marketingEmails(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type NotificationSettings", field.Name)
 		},
 	}
 	return fc, nil
@@ -4330,6 +4806,68 @@ func (ec *executionContext) unmarshalInputJobsFilter(ctx context.Context, obj an
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.Context, obj any) (NotificationSettingsInput, error) {
+	var it NotificationSettingsInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"jobCompleted", "jobFailed", "providerOffline", "usageThreshold", "weeklySummary", "marketingEmails"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "jobCompleted":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jobCompleted"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.JobCompleted = data
+		case "jobFailed":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jobFailed"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.JobFailed = data
+		case "providerOffline":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("providerOffline"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProviderOffline = data
+		case "usageThreshold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("usageThreshold"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UsageThreshold = data
+		case "weeklySummary":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("weeklySummary"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WeeklySummary = data
+		case "marketingEmails":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("marketingEmails"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MarketingEmails = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputPaginationInput(ctx context.Context, obj any) (PaginationInput, error) {
 	var it PaginationInput
 	asMap := map[string]any{}
@@ -4365,6 +4903,81 @@ func (ec *executionContext) unmarshalInputPaginationInput(ctx context.Context, o
 				return it, err
 			}
 			it.Offset = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTenantSettingsInput(ctx context.Context, obj any) (TenantSettingsInput, error) {
+	var it TenantSettingsInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"darkMode", "notifications"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "darkMode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("darkMode"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DarkMode = data
+		case "notifications":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notifications"))
+			data, err := ec.unmarshalONotificationSettingsInput2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐNotificationSettingsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Notifications = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateTenantInput(ctx context.Context, obj any) (UpdateTenantInput, error) {
+	var it UpdateTenantInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "defaultProvider", "settings"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "defaultProvider":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("defaultProvider"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DefaultProvider = data
+		case "settings":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("settings"))
+			data, err := ec.unmarshalOTenantSettingsInput2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantSettingsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Settings = data
 		}
 	}
 
@@ -4591,6 +5204,77 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_cancelJob(ctx, field)
 			})
+		case "updateTenant":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateTenant(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var notificationSettingsImplementors = []string{"NotificationSettings"}
+
+func (ec *executionContext) _NotificationSettings(ctx context.Context, sel ast.SelectionSet, obj *NotificationSettings) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, notificationSettingsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NotificationSettings")
+		case "jobCompleted":
+			out.Values[i] = ec._NotificationSettings_jobCompleted(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "jobFailed":
+			out.Values[i] = ec._NotificationSettings_jobFailed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "providerOffline":
+			out.Values[i] = ec._NotificationSettings_providerOffline(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "usageThreshold":
+			out.Values[i] = ec._NotificationSettings_usageThreshold(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "weeklySummary":
+			out.Values[i] = ec._NotificationSettings_weeklySummary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "marketingEmails":
+			out.Values[i] = ec._NotificationSettings_marketingEmails(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4924,6 +5608,10 @@ func (ec *executionContext) _Tenant(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "defaultProvider":
+			out.Values[i] = ec._Tenant_defaultProvider(ctx, field, obj)
+		case "settings":
+			out.Values[i] = ec._Tenant_settings(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Tenant_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4931,6 +5619,50 @@ func (ec *executionContext) _Tenant(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Tenant_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var tenantSettingsImplementors = []string{"TenantSettings"}
+
+func (ec *executionContext) _TenantSettings(ctx context.Context, sel ast.SelectionSet, obj *TenantSettings) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tenantSettingsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TenantSettings")
+		case "darkMode":
+			out.Values[i] = ec._TenantSettings_darkMode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "notifications":
+			out.Values[i] = ec._TenantSettings_notifications(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -5598,6 +6330,16 @@ func (ec *executionContext) marshalNJobType2githubᚗcomᚋingvarᚋaiaggregator
 	return v
 }
 
+func (ec *executionContext) marshalNNotificationSettings2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐNotificationSettings(ctx context.Context, sel ast.SelectionSet, v *NotificationSettings) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._NotificationSettings(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *PageInfo) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -5688,6 +6430,20 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
+func (ec *executionContext) marshalNTenant2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenant(ctx context.Context, sel ast.SelectionSet, v Tenant) graphql.Marshaler {
+	return ec._Tenant(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTenant2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenant(ctx context.Context, sel ast.SelectionSet, v *Tenant) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Tenant(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {
 	res, err := graphql.UnmarshalTime(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5702,6 +6458,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNUpdateTenantInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdateTenantInput(ctx context.Context, v any) (UpdateTenantInput, error) {
+	res, err := ec.unmarshalInputUpdateTenantInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNUsageSummary2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUsageSummaryᚄ(ctx context.Context, sel ast.SelectionSet, v []*UsageSummary) graphql.Marshaler {
@@ -6106,6 +6867,14 @@ func (ec *executionContext) unmarshalOJobsFilter2ᚖgithubᚗcomᚋingvarᚋaiag
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalONotificationSettingsInput2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐNotificationSettingsInput(ctx context.Context, v any) (*NotificationSettingsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputNotificationSettingsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOPaginationInput2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐPaginationInput(ctx context.Context, v any) (*PaginationInput, error) {
 	if v == nil {
 		return nil, nil
@@ -6137,6 +6906,21 @@ func (ec *executionContext) marshalOTenant2ᚖgithubᚗcomᚋingvarᚋaiaggregat
 		return graphql.Null
 	}
 	return ec._Tenant(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOTenantSettings2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantSettings(ctx context.Context, sel ast.SelectionSet, v *TenantSettings) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TenantSettings(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOTenantSettingsInput2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantSettingsInput(ctx context.Context, v any) (*TenantSettingsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputTenantSettingsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOTime2ᚖtimeᚐTime(ctx context.Context, v any) (*time.Time, error) {

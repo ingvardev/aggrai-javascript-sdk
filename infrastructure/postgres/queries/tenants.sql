@@ -14,7 +14,7 @@ RETURNING *;
 
 -- name: UpdateTenant :one
 UPDATE tenants
-SET name = $2, active = $3, updated_at = NOW()
+SET name = $2, active = $3, default_provider = $4, settings = $5, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 

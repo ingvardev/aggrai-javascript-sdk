@@ -20,22 +20,59 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTenant } from '@/lib/hooks'
+import { useTenant, useUpdateTenant } from '@/lib/hooks'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 export function GeneralSettings() {
   const { data: tenant, isLoading, error } = useTenant()
-  const [tenantName, setTenantName] = useState('')
-  const [defaultProvider, setDefaultProvider] = useState('auto')
-  const [darkMode, setDarkMode] = useState(true)
+  const updateTenant = useUpdateTenant()
+  const [tenantName, setTenantName] = useState<string | null>(null)
+  const [defaultProvider, setDefaultProvider] = useState<string | null>(null)
+  const [darkMode, setDarkMode] = useState<boolean | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
 
   // Update local state when tenant data loads
   useEffect(() => {
-    if (tenant?.name) {
+    if (tenant) {
       setTenantName(tenant.name)
+      setDefaultProvider(tenant.defaultProvider || 'auto')
+      setDarkMode(tenant.settings?.darkMode ?? true)
     }
-  }, [tenant?.name])
+  }, [tenant])
 
-  if (isLoading) {
+  // Track changes
+  useEffect(() => {
+    if (tenant && tenantName !== null) {
+      const nameChanged = tenantName !== tenant.name
+      const providerChanged = defaultProvider !== (tenant.defaultProvider || 'auto')
+      const darkModeChanged = darkMode !== (tenant.settings?.darkMode ?? true)
+      setHasChanges(nameChanged || providerChanged || darkModeChanged)
+    }
+  }, [tenantName, defaultProvider, darkMode, tenant])
+
+  const handleSave = async () => {
+    try {
+      await updateTenant.mutateAsync({
+        name: tenantName!,
+        defaultProvider: defaultProvider === 'auto' ? '' : defaultProvider!,
+        settings: {
+          darkMode: darkMode!,
+        },
+      })
+
+      setHasChanges(false)
+      toast.success('Settings saved', {
+        description: 'Your preferences have been updated.',
+      })
+    } catch (err) {
+      toast.error('Failed to save settings', {
+        description: 'Please try again later.',
+      })
+    }
+  }
+
+  if (isLoading || tenantName === null) {
     return (
       <div className="space-y-6">
         <Card>
@@ -92,7 +129,7 @@ export function GeneralSettings() {
             <Label htmlFor="tenant-name">Tenant Name</Label>
             <Input
               id="tenant-name"
-              value={tenantName}
+              value={tenantName!}
               onChange={(e) => setTenantName(e.target.value)}
               placeholder="Enter tenant name"
             />
@@ -108,7 +145,7 @@ export function GeneralSettings() {
 
           <div className="space-y-2">
             <Label htmlFor="default-provider">Default Provider</Label>
-            <Select value={defaultProvider} onValueChange={setDefaultProvider}>
+            <Select value={defaultProvider!} onValueChange={(v) => setDefaultProvider(v)}>
               <SelectTrigger id="default-provider">
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
@@ -157,13 +194,16 @@ export function GeneralSettings() {
                 Use dark theme for the dashboard
               </p>
             </div>
-            <Switch checked={darkMode} onCheckedChange={setDarkMode} />
+            <Switch checked={darkMode!} onCheckedChange={(v) => setDarkMode(v)} />
           </div>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button>Save Changes</Button>
+        <Button onClick={handleSave} disabled={updateTenant.isPending || !hasChanges}>
+          {updateTenant.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save Changes
+        </Button>
       </div>
     </div>
   )

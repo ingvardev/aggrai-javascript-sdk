@@ -130,10 +130,26 @@ export const CREATE_JOB_MUTATION = `
 `
 
 // Tenant types
+export interface NotificationSettings {
+  jobCompleted: boolean
+  jobFailed: boolean
+  providerOffline: boolean
+  usageThreshold: boolean
+  weeklySummary: boolean
+  marketingEmails: boolean
+}
+
+export interface TenantSettings {
+  darkMode: boolean
+  notifications: NotificationSettings
+}
+
 export interface Tenant {
   id: string
   name: string
   active: boolean
+  defaultProvider?: string
+  settings?: TenantSettings
   createdAt: string
   updatedAt: string
 }
@@ -144,6 +160,42 @@ export const ME_QUERY = `
       id
       name
       active
+      defaultProvider
+      settings {
+        darkMode
+        notifications {
+          jobCompleted
+          jobFailed
+          providerOffline
+          usageThreshold
+          weeklySummary
+          marketingEmails
+        }
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const UPDATE_TENANT_MUTATION = `
+  mutation UpdateTenant($input: UpdateTenantInput!) {
+    updateTenant(input: $input) {
+      id
+      name
+      active
+      defaultProvider
+      settings {
+        darkMode
+        notifications {
+          jobCompleted
+          jobFailed
+          providerOffline
+          usageThreshold
+          weeklySummary
+          marketingEmails
+        }
+      }
       createdAt
       updatedAt
     }

@@ -20,17 +20,20 @@ import (
 type Resolver struct {
 	jobService       *usecases.JobService
 	authService      *usecases.AuthService
+	tenantRepo       usecases.TenantRepository
 	providerRegistry *providers.ProviderRegistry
 }
 
 func NewResolver(
 	jobService *usecases.JobService,
 	authService *usecases.AuthService,
+	tenantRepo usecases.TenantRepository,
 	providerRegistry *providers.ProviderRegistry,
 ) *Resolver {
 	return &Resolver{
 		jobService:       jobService,
 		authService:      authService,
+		tenantRepo:       tenantRepo,
 		providerRegistry: providerRegistry,
 	}
 }

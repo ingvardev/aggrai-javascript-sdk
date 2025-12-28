@@ -10,8 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { formatDate, formatCurrency, truncate } from '@/lib/utils'
-import { Eye, MoreHorizontal, RefreshCw, Loader2, Wifi, WifiOff } from 'lucide-react'
+import { Eye, MoreHorizontal, RefreshCw, Loader2, Search, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +30,7 @@ import { useJobs } from '@/lib/hooks'
 import { useJobSubscription } from '@/lib/hooks/use-subscriptions'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 const statusVariant = {
   PENDING: 'secondary',
@@ -36,10 +44,37 @@ const typeVariant = {
   IMAGE: 'default',
 } as const
 
+type StatusFilter = 'ALL' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+type TypeFilter = 'ALL' | 'TEXT' | 'IMAGE'
+
 export function JobsTable() {
-  const { data: jobs, isLoading, error, isFetching } = useJobs()
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Build filter for API
+  const apiFilter = useMemo(() => {
+    const filter: { status?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; type?: 'TEXT' | 'IMAGE' } = {}
+    if (statusFilter !== 'ALL') filter.status = statusFilter
+    if (typeFilter !== 'ALL') filter.type = typeFilter
+    return Object.keys(filter).length > 0 ? filter : undefined
+  }, [statusFilter, typeFilter])
+
+  const { data: jobs, isLoading, error, isFetching } = useJobs(apiFilter)
   const queryClient = useQueryClient()
-  const [isConnected, setIsConnected] = useState(true)
+
+  // Client-side search filtering
+  const filteredJobs = useMemo(() => {
+    if (!jobs?.edges) return []
+    if (!searchQuery.trim()) return jobs.edges
+
+    const query = searchQuery.toLowerCase()
+    return jobs.edges.filter(({ node: job }) =>
+      job.input.toLowerCase().includes(query) ||
+      job.id.toLowerCase().includes(query) ||
+      job.provider?.toLowerCase().includes(query)
+    )
+  }, [jobs?.edges, searchQuery])
 
   // Subscribe to real-time job updates
   useJobSubscription({
@@ -54,6 +89,14 @@ export function JobsTable() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['jobs'] })
   }
+
+  const handleClearFilters = () => {
+    setStatusFilter('ALL')
+    setTypeFilter('ALL')
+    setSearchQuery('')
+  }
+
+  const hasActiveFilters = statusFilter !== 'ALL' || typeFilter !== 'ALL' || searchQuery.trim() !== ''
 
   return (
     <Card>
@@ -71,6 +114,47 @@ export function JobsTable() {
             Refresh
           </Button>
         </div>
+
+        {/* Filters and Search */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by input, ID, or provider..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="PROCESSING">Processing</SelectItem>
+              <SelectItem value="COMPLETED">Completed</SelectItem>
+              <SelectItem value="FAILED">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+            <SelectTrigger className="w-full sm:w-[120px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Types</SelectItem>
+              <SelectItem value="TEXT">Text</SelectItem>
+              <SelectItem value="IMAGE">Image</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-10">
+              <X className="mr-1 h-4 w-4" />
+              Clear
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -81,12 +165,19 @@ export function JobsTable() {
           <div className="py-12 text-center text-sm text-muted-foreground">
             Failed to load jobs. Is the API running at localhost:8080?
           </div>
-        ) : jobs?.edges.length === 0 ? (
+        ) : filteredJobs.length === 0 ? (
           <div className="py-12 text-center text-sm text-muted-foreground">
-            No jobs yet. Create your first job!
+            {jobs?.edges.length === 0
+              ? 'No jobs yet. Create your first job!'
+              : 'No jobs match your filters.'}
           </div>
         ) : (
           <div className="relative overflow-x-auto">
+            {searchQuery && (
+              <p className="mb-3 text-sm text-muted-foreground">
+                Showing {filteredJobs.length} of {jobs?.edges.length} jobs
+              </p>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
@@ -117,7 +208,7 @@ export function JobsTable() {
                 </tr>
               </thead>
               <tbody>
-                {jobs?.edges.map(({ node: job }) => (
+                {filteredJobs.map(({ node: job }) => (
                   <tr key={job.id} className="border-b last:border-0">
                     <td className="py-3 pr-4">
                       <div className="max-w-[200px]">

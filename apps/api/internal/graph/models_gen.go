@@ -51,6 +51,24 @@ type JobsFilter struct {
 type Mutation struct {
 }
 
+type NotificationSettings struct {
+	JobCompleted    bool `json:"jobCompleted"`
+	JobFailed       bool `json:"jobFailed"`
+	ProviderOffline bool `json:"providerOffline"`
+	UsageThreshold  bool `json:"usageThreshold"`
+	WeeklySummary   bool `json:"weeklySummary"`
+	MarketingEmails bool `json:"marketingEmails"`
+}
+
+type NotificationSettingsInput struct {
+	JobCompleted    *bool `json:"jobCompleted,omitempty"`
+	JobFailed       *bool `json:"jobFailed,omitempty"`
+	ProviderOffline *bool `json:"providerOffline,omitempty"`
+	UsageThreshold  *bool `json:"usageThreshold,omitempty"`
+	WeeklySummary   *bool `json:"weeklySummary,omitempty"`
+	MarketingEmails *bool `json:"marketingEmails,omitempty"`
+}
+
 type PageInfo struct {
 	TotalCount      int  `json:"totalCount"`
 	HasNextPage     bool `json:"hasNextPage"`
@@ -77,11 +95,29 @@ type Subscription struct {
 }
 
 type Tenant struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID              string          `json:"id"`
+	Name            string          `json:"name"`
+	Active          bool            `json:"active"`
+	DefaultProvider *string         `json:"defaultProvider,omitempty"`
+	Settings        *TenantSettings `json:"settings,omitempty"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	UpdatedAt       time.Time       `json:"updatedAt"`
+}
+
+type TenantSettings struct {
+	DarkMode      bool                  `json:"darkMode"`
+	Notifications *NotificationSettings `json:"notifications"`
+}
+
+type TenantSettingsInput struct {
+	DarkMode      *bool                      `json:"darkMode,omitempty"`
+	Notifications *NotificationSettingsInput `json:"notifications,omitempty"`
+}
+
+type UpdateTenantInput struct {
+	Name            *string              `json:"name,omitempty"`
+	DefaultProvider *string              `json:"defaultProvider,omitempty"`
+	Settings        *TenantSettingsInput `json:"settings,omitempty"`
 }
 
 type Usage struct {

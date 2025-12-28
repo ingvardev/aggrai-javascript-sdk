@@ -3,6 +3,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -171,10 +172,28 @@ func (r *PostgresTenantRepository) GetByAPIKey(ctx context.Context, apiKey strin
 }
 
 func (r *PostgresTenantRepository) Update(ctx context.Context, tenant *domain.Tenant) error {
-	_, err := r.queries.UpdateTenant(ctx, db.UpdateTenantParams{
-		ID:     uuidToPgtype(tenant.ID),
-		Name:   tenant.Name,
-		Active: pgtype.Bool{Bool: tenant.Active, Valid: true},
+	// Serialize settings to JSON
+	settingsJSON, err := json.Marshal(map[string]interface{}{
+		"darkMode": tenant.Settings.DarkMode,
+		"notifications": map[string]bool{
+			"jobCompleted":    tenant.Settings.Notifications.JobCompleted,
+			"jobFailed":       tenant.Settings.Notifications.JobFailed,
+			"providerOffline": tenant.Settings.Notifications.ProviderOffline,
+			"usageThreshold":  tenant.Settings.Notifications.UsageThreshold,
+			"weeklySummary":   tenant.Settings.Notifications.WeeklySummary,
+			"marketingEmails": tenant.Settings.Notifications.MarketingEmails,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("marshal settings: %w", err)
+	}
+
+	_, err = r.queries.UpdateTenant(ctx, db.UpdateTenantParams{
+		ID:              uuidToPgtype(tenant.ID),
+		Name:            tenant.Name,
+		Active:          pgtype.Bool{Bool: tenant.Active, Valid: true},
+		DefaultProvider: pgtype.Text{String: tenant.DefaultProvider, Valid: tenant.DefaultProvider != ""},
+		Settings:        settingsJSON,
 	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -386,14 +405,45 @@ func dbJobToDomain(j *db.Job) *domain.Job {
 }
 
 func dbTenantToDomain(t *db.Tenant) *domain.Tenant {
-	return &domain.Tenant{
+	tenant := &domain.Tenant{
 		ID:        pgtypeToUUID(t.ID),
 		Name:      t.Name,
 		APIKey:    t.ApiKey,
 		Active:    t.Active.Bool,
 		CreatedAt: t.CreatedAt.Time,
 		UpdatedAt: t.UpdatedAt.Time,
+		Settings:  domain.DefaultTenantSettings(),
 	}
+
+	if t.DefaultProvider.Valid {
+		tenant.DefaultProvider = t.DefaultProvider.String
+	}
+
+	// Parse settings from JSONB
+	if len(t.Settings) > 0 {
+		var settings struct {
+			DarkMode      bool `json:"darkMode"`
+			Notifications struct {
+				JobCompleted    bool `json:"jobCompleted"`
+				JobFailed       bool `json:"jobFailed"`
+				ProviderOffline bool `json:"providerOffline"`
+				UsageThreshold  bool `json:"usageThreshold"`
+				WeeklySummary   bool `json:"weeklySummary"`
+				MarketingEmails bool `json:"marketingEmails"`
+			} `json:"notifications"`
+		}
+		if err := json.Unmarshal(t.Settings, &settings); err == nil {
+			tenant.Settings.DarkMode = settings.DarkMode
+			tenant.Settings.Notifications.JobCompleted = settings.Notifications.JobCompleted
+			tenant.Settings.Notifications.JobFailed = settings.Notifications.JobFailed
+			tenant.Settings.Notifications.ProviderOffline = settings.Notifications.ProviderOffline
+			tenant.Settings.Notifications.UsageThreshold = settings.Notifications.UsageThreshold
+			tenant.Settings.Notifications.WeeklySummary = settings.Notifications.WeeklySummary
+			tenant.Settings.Notifications.MarketingEmails = settings.Notifications.MarketingEmails
+		}
+	}
+
+	return tenant
 }
 
 func dbUsageToDomain(u *db.Usage) *domain.Usage {
