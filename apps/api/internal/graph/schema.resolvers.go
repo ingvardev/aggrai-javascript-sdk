@@ -117,6 +117,101 @@ func (r *mutationResolver) UpdateTenant(ctx context.Context, input UpdateTenantI
 	return domainTenantToGraphQL(tenant), nil
 }
 
+// CreatePricing is the resolver for the createPricing field.
+func (r *mutationResolver) CreatePricing(ctx context.Context, input CreatePricingInput) (*ProviderPricing, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	pricing := &domain.ProviderPricing{
+		Provider:              input.Provider,
+		Model:                 input.Model,
+		InputPricePerMillion:  input.InputPricePerMillion,
+		OutputPricePerMillion: input.OutputPricePerMillion,
+		IsDefault:             input.IsDefault != nil && *input.IsDefault,
+	}
+
+	if input.ImagePrice != nil {
+		pricing.ImagePrice = input.ImagePrice
+	}
+
+	if err := r.pricingService.Create(ctx, pricing); err != nil {
+		return nil, err
+	}
+
+	return domainPricingToGraphQL(pricing), nil
+}
+
+// UpdatePricing is the resolver for the updatePricing field.
+func (r *mutationResolver) UpdatePricing(ctx context.Context, input UpdatePricingInput) (*ProviderPricing, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	pricingID, err := uuid.Parse(input.ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pricing ID: %w", err)
+	}
+
+	pricing, err := r.pricingService.GetPricing(ctx, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Get existing pricing by ID
+	existingPricing, err := r.pricingService.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var found *domain.ProviderPricing
+	for _, p := range existingPricing {
+		if p.ID == pricingID {
+			found = p
+			break
+		}
+	}
+
+	if found == nil {
+		return nil, fmt.Errorf("pricing not found")
+	}
+
+	found.InputPricePerMillion = input.InputPricePerMillion
+	found.OutputPricePerMillion = input.OutputPricePerMillion
+	found.ImagePrice = input.ImagePrice
+	if input.IsDefault != nil {
+		found.IsDefault = *input.IsDefault
+	}
+
+	if err := r.pricingService.Update(ctx, found); err != nil {
+		return nil, err
+	}
+
+	_ = pricing // unused variable fix
+	return domainPricingToGraphQL(found), nil
+}
+
+// DeletePricing is the resolver for the deletePricing field.
+func (r *mutationResolver) DeletePricing(ctx context.Context, id string) (bool, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return false, fmt.Errorf("unauthorized")
+	}
+
+	pricingID, err := uuid.Parse(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid pricing ID: %w", err)
+	}
+
+	if err := r.pricingService.Delete(ctx, pricingID); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*Tenant, error) {
 	tenant := middleware.TenantFromContext(ctx)
@@ -236,6 +331,46 @@ func (r *queryResolver) Providers(ctx context.Context) ([]*Provider, error) {
 	return result, nil
 }
 
+// PricingList is the resolver for the pricingList field.
+func (r *queryResolver) PricingList(ctx context.Context) ([]*ProviderPricing, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	pricings, err := r.pricingService.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*ProviderPricing, len(pricings))
+	for i, p := range pricings {
+		result[i] = domainPricingToGraphQL(p)
+	}
+
+	return result, nil
+}
+
+// PricingByProvider is the resolver for the pricingByProvider field.
+func (r *queryResolver) PricingByProvider(ctx context.Context, provider string) ([]*ProviderPricing, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	pricings, err := r.pricingService.ListByProvider(ctx, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*ProviderPricing, len(pricings))
+	for i, p := range pricings {
+		result[i] = domainPricingToGraphQL(p)
+	}
+
+	return result, nil
+}
+
 // JobUpdated is the resolver for the jobUpdated field.
 func (r *subscriptionResolver) JobUpdated(ctx context.Context) (<-chan *Job, error) {
 	tenant := middleware.TenantFromContext(ctx)
@@ -292,6 +427,51 @@ func (r *subscriptionResolver) JobStatusChanged(ctx context.Context, jobID strin
 	go func() {
 		<-ctx.Done()
 		JobPubSub.UnsubscribeFromJob(jobID, ch)
+		close(ch)
+	}()
+
+	return ch, nil
+}
+
+// UsageUpdated is the resolver for the usageUpdated field.
+func (r *subscriptionResolver) UsageUpdated(ctx context.Context) (<-chan []*UsageSummary, error) {
+	tenant := middleware.TenantFromContext(ctx)
+	if tenant == nil {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	// Create a channel to send usage updates
+	ch := make(chan []*UsageSummary, 1)
+	tenantID := tenant.ID.String()
+
+	// Send initial usage data
+	go func() {
+		usage, err := r.usageRepo.GetSummary(ctx, tenant.ID)
+		if err == nil {
+			gqlUsage := make([]*UsageSummary, len(usage))
+			for i, u := range usage {
+				gqlUsage[i] = &UsageSummary{
+					Provider:       u.Provider,
+					TotalTokensIn:  u.TotalTokensIn,
+					TotalTokensOut: u.TotalTokensOut,
+					TotalCost:      u.TotalCost,
+					JobCount:       u.JobCount,
+				}
+			}
+			select {
+			case ch <- gqlUsage:
+			default:
+			}
+		}
+	}()
+
+	// Subscribe to usage updates for this tenant
+	UsagePubSub.Subscribe(tenantID, ch)
+
+	// Clean up when context is done
+	go func() {
+		<-ctx.Done()
+		UsagePubSub.Unsubscribe(tenantID, ch)
 		close(ch)
 	}()
 

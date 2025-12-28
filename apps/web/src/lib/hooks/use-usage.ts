@@ -2,20 +2,26 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { graphqlClient, UsageSummary, USAGE_SUMMARY_QUERY } from '@/lib/api'
+import { useUsageSubscription } from './use-subscriptions'
 
 interface UsageSummaryResponse {
   usageSummary: UsageSummary[]
 }
 
 export function useUsageSummary() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['usage', 'summary'],
     queryFn: async () => {
       const data = await graphqlClient.request<UsageSummaryResponse>(USAGE_SUMMARY_QUERY)
       return data.usageSummary
     },
-    refetchInterval: 30000,
+    // No need for refetchInterval - subscription handles real-time updates
   })
+
+  // Subscribe to real-time usage updates
+  useUsageSubscription({ enabled: true })
+
+  return query
 }
 
 // Compute totals from usage summary

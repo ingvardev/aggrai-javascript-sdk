@@ -200,4 +200,9 @@ type Subscription {
   Subscribe to updates for a specific job
   """
   jobStatusChanged(jobId: ID!): Job!
+
+  """
+  Subscribe to usage summary updates for the current tenant
+  """
+  usageUpdated: [UsageSummary!]!
 }

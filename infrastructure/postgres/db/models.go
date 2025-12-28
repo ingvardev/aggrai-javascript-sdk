@@ -40,6 +40,18 @@ type Provider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type ProviderPricing struct {
+	ID                    pgtype.UUID        `db:"id" json:"id"`
+	Provider              string             `db:"provider" json:"provider"`
+	Model                 string             `db:"model" json:"model"`
+	InputPricePerMillion  pgtype.Numeric     `db:"input_price_per_million" json:"input_price_per_million"`
+	OutputPricePerMillion pgtype.Numeric     `db:"output_price_per_million" json:"output_price_per_million"`
+	ImagePrice            pgtype.Numeric     `db:"image_price" json:"image_price"`
+	IsDefault             bool               `db:"is_default" json:"is_default"`
+	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Tenant struct {
 	ID              pgtype.UUID        `db:"id" json:"id"`
 	Name            string             `db:"name" json:"name"`

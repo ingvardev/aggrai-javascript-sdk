@@ -77,9 +77,12 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CancelJob    func(childComplexity int, id string) int
-		CreateJob    func(childComplexity int, input CreateJobInput) int
-		UpdateTenant func(childComplexity int, input UpdateTenantInput) int
+		CancelJob     func(childComplexity int, id string) int
+		CreateJob     func(childComplexity int, input CreateJobInput) int
+		CreatePricing func(childComplexity int, input CreatePricingInput) int
+		DeletePricing func(childComplexity int, id string) int
+		UpdatePricing func(childComplexity int, input UpdatePricingInput) int
+		UpdateTenant  func(childComplexity int, input UpdateTenantInput) int
 	}
 
 	NotificationSettings struct {
@@ -105,17 +108,32 @@ type ComplexityRoot struct {
 		Type     func(childComplexity int) int
 	}
 
+	ProviderPricing struct {
+		CreatedAt             func(childComplexity int) int
+		ID                    func(childComplexity int) int
+		ImagePrice            func(childComplexity int) int
+		InputPricePerMillion  func(childComplexity int) int
+		IsDefault             func(childComplexity int) int
+		Model                 func(childComplexity int) int
+		OutputPricePerMillion func(childComplexity int) int
+		Provider              func(childComplexity int) int
+		UpdatedAt             func(childComplexity int) int
+	}
+
 	Query struct {
-		Job          func(childComplexity int, id string) int
-		Jobs         func(childComplexity int, filter *JobsFilter, pagination *PaginationInput) int
-		Me           func(childComplexity int) int
-		Providers    func(childComplexity int) int
-		UsageSummary func(childComplexity int) int
+		Job               func(childComplexity int, id string) int
+		Jobs              func(childComplexity int, filter *JobsFilter, pagination *PaginationInput) int
+		Me                func(childComplexity int) int
+		PricingByProvider func(childComplexity int, provider string) int
+		PricingList       func(childComplexity int) int
+		Providers         func(childComplexity int) int
+		UsageSummary      func(childComplexity int) int
 	}
 
 	Subscription struct {
 		JobStatusChanged func(childComplexity int, jobID string) int
 		JobUpdated       func(childComplexity int) int
+		UsageUpdated     func(childComplexity int) int
 	}
 
 	Tenant struct {
@@ -158,6 +176,9 @@ type MutationResolver interface {
 	CreateJob(ctx context.Context, input CreateJobInput) (*Job, error)
 	CancelJob(ctx context.Context, id string) (*Job, error)
 	UpdateTenant(ctx context.Context, input UpdateTenantInput) (*Tenant, error)
+	CreatePricing(ctx context.Context, input CreatePricingInput) (*ProviderPricing, error)
+	UpdatePricing(ctx context.Context, input UpdatePricingInput) (*ProviderPricing, error)
+	DeletePricing(ctx context.Context, id string) (bool, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*Tenant, error)
@@ -165,10 +186,13 @@ type QueryResolver interface {
 	Jobs(ctx context.Context, filter *JobsFilter, pagination *PaginationInput) (*JobConnection, error)
 	UsageSummary(ctx context.Context) ([]*UsageSummary, error)
 	Providers(ctx context.Context) ([]*Provider, error)
+	PricingList(ctx context.Context) ([]*ProviderPricing, error)
+	PricingByProvider(ctx context.Context, provider string) ([]*ProviderPricing, error)
 }
 type SubscriptionResolver interface {
 	JobUpdated(ctx context.Context) (<-chan *Job, error)
 	JobStatusChanged(ctx context.Context, jobID string) (<-chan *Job, error)
+	UsageUpdated(ctx context.Context) (<-chan []*UsageSummary, error)
 }
 
 type executableSchema struct {
@@ -329,6 +353,39 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreateJob(childComplexity, args["input"].(CreateJobInput)), true
+	case "Mutation.createPricing":
+		if e.complexity.Mutation.CreatePricing == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createPricing_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreatePricing(childComplexity, args["input"].(CreatePricingInput)), true
+	case "Mutation.deletePricing":
+		if e.complexity.Mutation.DeletePricing == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deletePricing_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeletePricing(childComplexity, args["id"].(string)), true
+	case "Mutation.updatePricing":
+		if e.complexity.Mutation.UpdatePricing == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updatePricing_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdatePricing(childComplexity, args["input"].(UpdatePricingInput)), true
 	case "Mutation.updateTenant":
 		if e.complexity.Mutation.UpdateTenant == nil {
 			break
@@ -428,6 +485,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Provider.Type(childComplexity), true
 
+	case "ProviderPricing.createdAt":
+		if e.complexity.ProviderPricing.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.CreatedAt(childComplexity), true
+	case "ProviderPricing.id":
+		if e.complexity.ProviderPricing.ID == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.ID(childComplexity), true
+	case "ProviderPricing.imagePrice":
+		if e.complexity.ProviderPricing.ImagePrice == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.ImagePrice(childComplexity), true
+	case "ProviderPricing.inputPricePerMillion":
+		if e.complexity.ProviderPricing.InputPricePerMillion == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.InputPricePerMillion(childComplexity), true
+	case "ProviderPricing.isDefault":
+		if e.complexity.ProviderPricing.IsDefault == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.IsDefault(childComplexity), true
+	case "ProviderPricing.model":
+		if e.complexity.ProviderPricing.Model == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.Model(childComplexity), true
+	case "ProviderPricing.outputPricePerMillion":
+		if e.complexity.ProviderPricing.OutputPricePerMillion == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.OutputPricePerMillion(childComplexity), true
+	case "ProviderPricing.provider":
+		if e.complexity.ProviderPricing.Provider == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.Provider(childComplexity), true
+	case "ProviderPricing.updatedAt":
+		if e.complexity.ProviderPricing.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.ProviderPricing.UpdatedAt(childComplexity), true
+
 	case "Query.job":
 		if e.complexity.Query.Job == nil {
 			break
@@ -456,6 +568,23 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Me(childComplexity), true
+	case "Query.pricingByProvider":
+		if e.complexity.Query.PricingByProvider == nil {
+			break
+		}
+
+		args, err := ec.field_Query_pricingByProvider_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PricingByProvider(childComplexity, args["provider"].(string)), true
+	case "Query.pricingList":
+		if e.complexity.Query.PricingList == nil {
+			break
+		}
+
+		return e.complexity.Query.PricingList(childComplexity), true
 	case "Query.providers":
 		if e.complexity.Query.Providers == nil {
 			break
@@ -486,6 +615,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Subscription.JobUpdated(childComplexity), true
+	case "Subscription.usageUpdated":
+		if e.complexity.Subscription.UsageUpdated == nil {
+			break
+		}
+
+		return e.complexity.Subscription.UsageUpdated(childComplexity), true
 
 	case "Tenant.active":
 		if e.complexity.Tenant.Active == nil {
@@ -638,10 +773,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCreateJobInput,
+		ec.unmarshalInputCreatePricingInput,
 		ec.unmarshalInputJobsFilter,
 		ec.unmarshalInputNotificationSettingsInput,
 		ec.unmarshalInputPaginationInput,
 		ec.unmarshalInputTenantSettingsInput,
+		ec.unmarshalInputUpdatePricingInput,
 		ec.unmarshalInputUpdateTenantInput,
 	)
 	first := true
@@ -798,6 +935,39 @@ func (ec *executionContext) field_Mutation_createJob_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createPricing_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNCreatePricingInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreatePricingInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deletePricing_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updatePricing_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdatePricingInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdatePricingInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateTenant_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -844,6 +1014,17 @@ func (ec *executionContext) field_Query_jobs_args(ctx context.Context, rawArgs m
 		return nil, err
 	}
 	args["pagination"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_pricingByProvider_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "provider", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["provider"] = arg0
 	return args, nil
 }
 
@@ -1710,6 +1891,169 @@ func (ec *executionContext) fieldContext_Mutation_updateTenant(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createPricing(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createPricing,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CreatePricing(ctx, fc.Args["input"].(CreatePricingInput))
+		},
+		nil,
+		ec.marshalNProviderPricing2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricing,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createPricing(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProviderPricing_id(ctx, field)
+			case "provider":
+				return ec.fieldContext_ProviderPricing_provider(ctx, field)
+			case "model":
+				return ec.fieldContext_ProviderPricing_model(ctx, field)
+			case "inputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_inputPricePerMillion(ctx, field)
+			case "outputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_outputPricePerMillion(ctx, field)
+			case "imagePrice":
+				return ec.fieldContext_ProviderPricing_imagePrice(ctx, field)
+			case "isDefault":
+				return ec.fieldContext_ProviderPricing_isDefault(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProviderPricing_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ProviderPricing_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProviderPricing", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createPricing_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updatePricing(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updatePricing,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdatePricing(ctx, fc.Args["input"].(UpdatePricingInput))
+		},
+		nil,
+		ec.marshalNProviderPricing2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricing,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updatePricing(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProviderPricing_id(ctx, field)
+			case "provider":
+				return ec.fieldContext_ProviderPricing_provider(ctx, field)
+			case "model":
+				return ec.fieldContext_ProviderPricing_model(ctx, field)
+			case "inputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_inputPricePerMillion(ctx, field)
+			case "outputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_outputPricePerMillion(ctx, field)
+			case "imagePrice":
+				return ec.fieldContext_ProviderPricing_imagePrice(ctx, field)
+			case "isDefault":
+				return ec.fieldContext_ProviderPricing_isDefault(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProviderPricing_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ProviderPricing_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProviderPricing", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updatePricing_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deletePricing(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_deletePricing,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().DeletePricing(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deletePricing(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deletePricing_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _NotificationSettings_jobCompleted(ctx context.Context, field graphql.CollectedField, obj *NotificationSettings) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2116,6 +2460,267 @@ func (ec *executionContext) fieldContext_Provider_priority(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _ProviderPricing_id(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_provider(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_provider,
+		func(ctx context.Context) (any, error) {
+			return obj.Provider, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_provider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_model(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_model,
+		func(ctx context.Context) (any, error) {
+			return obj.Model, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_model(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_inputPricePerMillion(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_inputPricePerMillion,
+		func(ctx context.Context) (any, error) {
+			return obj.InputPricePerMillion, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_inputPricePerMillion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_outputPricePerMillion(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_outputPricePerMillion,
+		func(ctx context.Context) (any, error) {
+			return obj.OutputPricePerMillion, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_outputPricePerMillion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_imagePrice(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_imagePrice,
+		func(ctx context.Context) (any, error) {
+			return obj.ImagePrice, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_imagePrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_isDefault(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_isDefault,
+		func(ctx context.Context) (any, error) {
+			return obj.IsDefault, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_isDefault(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_createdAt(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderPricing_updatedAt(ctx context.Context, field graphql.CollectedField, obj *ProviderPricing) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProviderPricing_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProviderPricing_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderPricing",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2363,6 +2968,116 @@ func (ec *executionContext) fieldContext_Query_providers(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_pricingList(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_pricingList,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().PricingList(ctx)
+		},
+		nil,
+		ec.marshalNProviderPricing2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricingᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_pricingList(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProviderPricing_id(ctx, field)
+			case "provider":
+				return ec.fieldContext_ProviderPricing_provider(ctx, field)
+			case "model":
+				return ec.fieldContext_ProviderPricing_model(ctx, field)
+			case "inputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_inputPricePerMillion(ctx, field)
+			case "outputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_outputPricePerMillion(ctx, field)
+			case "imagePrice":
+				return ec.fieldContext_ProviderPricing_imagePrice(ctx, field)
+			case "isDefault":
+				return ec.fieldContext_ProviderPricing_isDefault(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProviderPricing_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ProviderPricing_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProviderPricing", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_pricingByProvider(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_pricingByProvider,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().PricingByProvider(ctx, fc.Args["provider"].(string))
+		},
+		nil,
+		ec.marshalNProviderPricing2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricingᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_pricingByProvider(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProviderPricing_id(ctx, field)
+			case "provider":
+				return ec.fieldContext_ProviderPricing_provider(ctx, field)
+			case "model":
+				return ec.fieldContext_ProviderPricing_model(ctx, field)
+			case "inputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_inputPricePerMillion(ctx, field)
+			case "outputPricePerMillion":
+				return ec.fieldContext_ProviderPricing_outputPricePerMillion(ctx, field)
+			case "imagePrice":
+				return ec.fieldContext_ProviderPricing_imagePrice(ctx, field)
+			case "isDefault":
+				return ec.fieldContext_ProviderPricing_isDefault(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProviderPricing_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ProviderPricing_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProviderPricing", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_pricingByProvider_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2601,6 +3316,47 @@ func (ec *executionContext) fieldContext_Subscription_jobStatusChanged(ctx conte
 	if fc.Args, err = ec.field_Subscription_jobStatusChanged_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_usageUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_usageUpdated,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Subscription().UsageUpdated(ctx)
+		},
+		nil,
+		ec.marshalNUsageSummary2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUsageSummaryᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_usageUpdated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "provider":
+				return ec.fieldContext_UsageSummary_provider(ctx, field)
+			case "totalTokensIn":
+				return ec.fieldContext_UsageSummary_totalTokensIn(ctx, field)
+			case "totalTokensOut":
+				return ec.fieldContext_UsageSummary_totalTokensOut(ctx, field)
+			case "totalCost":
+				return ec.fieldContext_UsageSummary_totalCost(ctx, field)
+			case "jobCount":
+				return ec.fieldContext_UsageSummary_jobCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UsageSummary", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -4772,6 +5528,68 @@ func (ec *executionContext) unmarshalInputCreateJobInput(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreatePricingInput(ctx context.Context, obj any) (CreatePricingInput, error) {
+	var it CreatePricingInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"provider", "model", "inputPricePerMillion", "outputPricePerMillion", "imagePrice", "isDefault"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "provider":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("provider"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Provider = data
+		case "model":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("model"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Model = data
+		case "inputPricePerMillion":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("inputPricePerMillion"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.InputPricePerMillion = data
+		case "outputPricePerMillion":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("outputPricePerMillion"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OutputPricePerMillion = data
+		case "imagePrice":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imagePrice"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImagePrice = data
+		case "isDefault":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDefault"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsDefault = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputJobsFilter(ctx context.Context, obj any) (JobsFilter, error) {
 	var it JobsFilter
 	asMap := map[string]any{}
@@ -4937,6 +5755,61 @@ func (ec *executionContext) unmarshalInputTenantSettingsInput(ctx context.Contex
 				return it, err
 			}
 			it.Notifications = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdatePricingInput(ctx context.Context, obj any) (UpdatePricingInput, error) {
+	var it UpdatePricingInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "inputPricePerMillion", "outputPricePerMillion", "imagePrice", "isDefault"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		case "inputPricePerMillion":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("inputPricePerMillion"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.InputPricePerMillion = data
+		case "outputPricePerMillion":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("outputPricePerMillion"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OutputPricePerMillion = data
+		case "imagePrice":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imagePrice"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImagePrice = data
+		case "isDefault":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDefault"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsDefault = data
 		}
 	}
 
@@ -5211,6 +6084,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createPricing":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createPricing(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatePricing":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updatePricing(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deletePricing":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deletePricing(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5406,6 +6300,82 @@ func (ec *executionContext) _Provider(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
+var providerPricingImplementors = []string{"ProviderPricing"}
+
+func (ec *executionContext) _ProviderPricing(ctx context.Context, sel ast.SelectionSet, obj *ProviderPricing) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, providerPricingImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProviderPricing")
+		case "id":
+			out.Values[i] = ec._ProviderPricing_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "provider":
+			out.Values[i] = ec._ProviderPricing_provider(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "model":
+			out.Values[i] = ec._ProviderPricing_model(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "inputPricePerMillion":
+			out.Values[i] = ec._ProviderPricing_inputPricePerMillion(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "outputPricePerMillion":
+			out.Values[i] = ec._ProviderPricing_outputPricePerMillion(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "imagePrice":
+			out.Values[i] = ec._ProviderPricing_imagePrice(ctx, field, obj)
+		case "isDefault":
+			out.Values[i] = ec._ProviderPricing_isDefault(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._ProviderPricing_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._ProviderPricing_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -5529,6 +6499,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "pricingList":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_pricingList(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "pricingByProvider":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_pricingByProvider(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -5577,6 +6591,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_jobUpdated(ctx, fields[0])
 	case "jobStatusChanged":
 		return ec._Subscription_jobStatusChanged(ctx, fields[0])
+	case "usageUpdated":
+		return ec._Subscription_usageUpdated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -6180,6 +7196,11 @@ func (ec *executionContext) unmarshalNCreateJobInput2githubᚗcomᚋingvarᚋaia
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreatePricingInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreatePricingInput(ctx context.Context, v any) (CreatePricingInput, error) {
+	res, err := ec.unmarshalInputCreatePricingInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -6404,6 +7425,64 @@ func (ec *executionContext) marshalNProvider2ᚖgithubᚗcomᚋingvarᚋaiaggreg
 	return ec._Provider(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNProviderPricing2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricing(ctx context.Context, sel ast.SelectionSet, v ProviderPricing) graphql.Marshaler {
+	return ec._ProviderPricing(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNProviderPricing2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricingᚄ(ctx context.Context, sel ast.SelectionSet, v []*ProviderPricing) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNProviderPricing2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricing(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProviderPricing2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderPricing(ctx context.Context, sel ast.SelectionSet, v *ProviderPricing) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProviderPricing(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNProviderType2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐProviderType(ctx context.Context, v any) (ProviderType, error) {
 	var res ProviderType
 	err := res.UnmarshalGQL(v)
@@ -6458,6 +7537,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNUpdatePricingInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdatePricingInput(ctx context.Context, v any) (UpdatePricingInput, error) {
+	res, err := ec.unmarshalInputUpdatePricingInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdateTenantInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdateTenantInput(ctx context.Context, v any) (UpdateTenantInput, error) {
@@ -6800,6 +7884,23 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {

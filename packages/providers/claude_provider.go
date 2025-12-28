@@ -15,17 +15,19 @@ import (
 
 // ClaudeProvider implements AI provider using Anthropic Claude API.
 type ClaudeProvider struct {
-	apiKey   string
-	model    string
-	endpoint string
-	client   *http.Client
+	apiKey         string
+	model          string
+	endpoint       string
+	client         *http.Client
+	pricingService *usecases.PricingService
 }
 
 // ClaudeConfig holds configuration for Claude provider.
 type ClaudeConfig struct {
-	APIKey   string
-	Model    string
-	Endpoint string
+	APIKey         string
+	Model          string
+	Endpoint       string
+	PricingService *usecases.PricingService
 }
 
 // NewClaudeProvider creates a new Claude provider.
@@ -38,10 +40,11 @@ func NewClaudeProvider(cfg ClaudeConfig) *ClaudeProvider {
 	}
 
 	return &ClaudeProvider{
-		apiKey:   cfg.APIKey,
-		model:    cfg.Model,
-		endpoint: cfg.Endpoint,
-		client:   &http.Client{},
+		apiKey:         cfg.APIKey,
+		model:          cfg.Model,
+		endpoint:       cfg.Endpoint,
+		client:         &http.Client{},
+		pricingService: cfg.PricingService,
 	}
 }
 
@@ -127,10 +130,20 @@ func (p *ClaudeProvider) Complete(ctx context.Context, request *usecases.Complet
 		return nil, fmt.Errorf("no response from Claude")
 	}
 
-	// Calculate cost (Haiku pricing)
-	inputCost := float64(claudeResp.Usage.InputTokens) * 0.00000025
-	outputCost := float64(claudeResp.Usage.OutputTokens) * 0.00000125
-	totalCost := inputCost + outputCost
+	// Calculate cost using pricing service or fallback to defaults
+	var totalCost float64
+	if p.pricingService != nil {
+		cost, err := p.pricingService.CalculateCost(ctx, "claude", p.model, claudeResp.Usage.InputTokens, claudeResp.Usage.OutputTokens)
+		if err == nil {
+			totalCost = cost
+		}
+	}
+	if totalCost == 0 {
+		// Fallback to default Haiku pricing
+		inputCost := float64(claudeResp.Usage.InputTokens) * 0.00000025
+		outputCost := float64(claudeResp.Usage.OutputTokens) * 0.00000125
+		totalCost = inputCost + outputCost
+	}
 
 	return &usecases.CompletionResponse{
 		Content:   claudeResp.Content[0].Text,

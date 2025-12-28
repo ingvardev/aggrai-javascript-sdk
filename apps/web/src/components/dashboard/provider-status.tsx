@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Cpu, Cloud, Server, Loader2 } from 'lucide-react'
 import { useProviders } from '@/lib/hooks'
+import { getProviderDisplayName } from '@/lib/utils'
 
 const providerIcons: Record<string, typeof Cloud> = {
   OPENAI: Cloud,
@@ -48,7 +49,7 @@ export function ProviderStatus() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{provider.name}</p>
+                      <p className="text-sm font-medium">{getProviderDisplayName(provider.name)}</p>
                       <p className="text-xs text-muted-foreground">
                         Priority: {provider.priority}
                       </p>

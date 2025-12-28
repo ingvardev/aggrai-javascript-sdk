@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
@@ -73,6 +74,14 @@ func main() {
 		log.Info().Msg("Using PostgreSQL repositories")
 	}
 
+	// Initialize pricing repository and service
+	var pricingService *usecases.PricingService
+	if pool != nil {
+		pricingRepo := adapters.NewPostgresPricingRepository(pool)
+		pricingService = usecases.NewPricingService(pricingRepo)
+		log.Info().Msg("Pricing service initialized")
+	}
+
 	// Initialize job queue (optional - gracefully handle Redis unavailability)
 	var jobQueue usecases.JobQueue
 	q, err := queue.NewAsynqQueue(cfg.RedisURL)
@@ -101,10 +110,33 @@ func main() {
 		} else {
 			log.Info().Msg("Subscribed to Redis for job updates")
 
+			// Create a callback to get usage data for a tenant
+			getUsageFunc := func(tenantIDStr string) []*graph.UsageSummary {
+				tenantID, err := uuid.Parse(tenantIDStr)
+				if err != nil {
+					return nil
+				}
+				usage, err := usageRepo.GetSummary(context.Background(), tenantID)
+				if err != nil {
+					return nil
+				}
+				result := make([]*graph.UsageSummary, len(usage))
+				for i, u := range usage {
+					result[i] = &graph.UsageSummary{
+						Provider:       u.Provider,
+						TotalTokensIn:  u.TotalTokensIn,
+						TotalTokensOut: u.TotalTokensOut,
+						TotalCost:      u.TotalCost,
+						JobCount:       u.JobCount,
+					}
+				}
+				return result
+			}
+
 			// Forward Redis updates to GraphQL subscriptions
 			go func() {
 				for update := range updates {
-					graph.JobPubSub.HandleRedisUpdate(update)
+					graph.JobPubSub.HandleRedisUpdateWithUsage(update, getUsageFunc)
 				}
 			}()
 		}
@@ -120,7 +152,8 @@ func main() {
 	// Register OpenAI if configured
 	if cfg.OpenAIAPIKey != "" {
 		openai := providers.NewOpenAIProvider(providers.OpenAIConfig{
-			APIKey: cfg.OpenAIAPIKey,
+			APIKey:         cfg.OpenAIAPIKey,
+			PricingService: pricingService,
 		})
 		providerRegistry.Register(openai)
 		log.Info().Msg("OpenAI provider registered")
@@ -129,7 +162,8 @@ func main() {
 	// Register Claude if configured
 	if cfg.AnthropicAPIKey != "" {
 		claude := providers.NewClaudeProvider(providers.ClaudeConfig{
-			APIKey: cfg.AnthropicAPIKey,
+			APIKey:         cfg.AnthropicAPIKey,
+			PricingService: pricingService,
 		})
 		providerRegistry.Register(claude)
 		log.Info().Msg("Claude provider registered")
@@ -183,7 +217,7 @@ func main() {
 	}
 
 	// GraphQL endpoint with auth middleware
-	graphResolver := graph.NewResolver(jobService, authService, tenantRepo, providerRegistry)
+	graphResolver := graph.NewResolver(jobService, authService, tenantRepo, usageRepo, pricingService, providerRegistry)
 	graphServer := graph.NewServer(graphResolver)
 
 	// Apply auth middleware for GraphQL

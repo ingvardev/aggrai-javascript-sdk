@@ -62,6 +62,14 @@ func main() {
 		usageRepo = adapters.NewPostgresUsageRepository(pool)
 	}
 
+	// Initialize pricing service
+	var pricingService *usecases.PricingService
+	if pool != nil {
+		pricingRepo := adapters.NewPostgresPricingRepository(pool)
+		pricingService = usecases.NewPricingService(pricingRepo)
+		log.Info().Msg("Pricing service initialized")
+	}
+
 	// Initialize provider registry with available providers
 	registry := providers.NewProviderRegistry()
 
@@ -72,7 +80,8 @@ func main() {
 	// Register OpenAI if configured
 	if cfg.OpenAIAPIKey != "" {
 		openai := providers.NewOpenAIProvider(providers.OpenAIConfig{
-			APIKey: cfg.OpenAIAPIKey,
+			APIKey:         cfg.OpenAIAPIKey,
+			PricingService: pricingService,
 		})
 		registry.Register(openai)
 		log.Info().Msg("OpenAI provider registered")
@@ -81,7 +90,8 @@ func main() {
 	// Register Claude if configured
 	if cfg.AnthropicAPIKey != "" {
 		claude := providers.NewClaudeProvider(providers.ClaudeConfig{
-			APIKey: cfg.AnthropicAPIKey,
+			APIKey:         cfg.AnthropicAPIKey,
+			PricingService: pricingService,
 		})
 		registry.Register(claude)
 		log.Info().Msg("Claude provider registered")

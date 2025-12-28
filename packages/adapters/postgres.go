@@ -362,6 +362,13 @@ func floatToNumeric(f float64) pgtype.Numeric {
 	return n
 }
 
+func floatPtrToNumeric(f *float64) pgtype.Numeric {
+	if f == nil {
+		return pgtype.Numeric{Valid: false}
+	}
+	return floatToNumeric(*f)
+}
+
 func numericToFloat(n pgtype.Numeric) float64 {
 	if !n.Valid {
 		return 0
@@ -461,5 +468,144 @@ func dbUsageToDomain(u *db.Usage) *domain.Usage {
 		TokensOut: pgtypeToInt(u.TokensOut),
 		Cost:      numericToFloat(u.Cost),
 		CreatedAt: u.CreatedAt.Time,
+	}
+}
+
+// PostgresPricingRepository implements PricingRepository using PostgreSQL.
+type PostgresPricingRepository struct {
+	queries *db.Queries
+	pool    *pgxpool.Pool
+}
+
+var _ usecases.PricingRepository = (*PostgresPricingRepository)(nil)
+
+// NewPostgresPricingRepository creates a new PostgresPricingRepository.
+func NewPostgresPricingRepository(pool *pgxpool.Pool) *PostgresPricingRepository {
+	return &PostgresPricingRepository{
+		queries: db.New(pool),
+		pool:    pool,
+	}
+}
+
+func (r *PostgresPricingRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.ProviderPricing, error) {
+	pricing, err := r.queries.GetPricing(ctx, uuidToPgtype(id))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get pricing: %w", err)
+	}
+	return dbPricingToDomain(&pricing), nil
+}
+
+func (r *PostgresPricingRepository) GetByProviderModel(ctx context.Context, provider, model string) (*domain.ProviderPricing, error) {
+	pricing, err := r.queries.GetPricingByProviderModel(ctx, db.GetPricingByProviderModelParams{
+		Provider: provider,
+		Model:    model,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get pricing by provider/model: %w", err)
+	}
+	return dbPricingToDomain(&pricing), nil
+}
+
+func (r *PostgresPricingRepository) GetDefaultByProvider(ctx context.Context, provider string) (*domain.ProviderPricing, error) {
+	pricing, err := r.queries.GetDefaultPricingByProvider(ctx, provider)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get default pricing: %w", err)
+	}
+	return dbPricingToDomain(&pricing), nil
+}
+
+func (r *PostgresPricingRepository) List(ctx context.Context) ([]*domain.ProviderPricing, error) {
+	pricings, err := r.queries.ListPricing(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list pricing: %w", err)
+	}
+
+	result := make([]*domain.ProviderPricing, len(pricings))
+	for i, p := range pricings {
+		result[i] = dbPricingToDomain(&p)
+	}
+	return result, nil
+}
+
+func (r *PostgresPricingRepository) ListByProvider(ctx context.Context, provider string) ([]*domain.ProviderPricing, error) {
+	pricings, err := r.queries.ListPricingByProvider(ctx, provider)
+	if err != nil {
+		return nil, fmt.Errorf("list pricing by provider: %w", err)
+	}
+
+	result := make([]*domain.ProviderPricing, len(pricings))
+	for i, p := range pricings {
+		result[i] = dbPricingToDomain(&p)
+	}
+	return result, nil
+}
+
+func (r *PostgresPricingRepository) Create(ctx context.Context, pricing *domain.ProviderPricing) error {
+	created, err := r.queries.CreatePricing(ctx, db.CreatePricingParams{
+		Provider:              pricing.Provider,
+		Model:                 pricing.Model,
+		InputPricePerMillion:  floatToNumeric(pricing.InputPricePerMillion),
+		OutputPricePerMillion: floatToNumeric(pricing.OutputPricePerMillion),
+		ImagePrice:            floatPtrToNumeric(pricing.ImagePrice),
+		IsDefault:             pricing.IsDefault,
+	})
+	if err != nil {
+		return fmt.Errorf("create pricing: %w", err)
+	}
+
+	pricing.ID = pgtypeToUUID(created.ID)
+	pricing.CreatedAt = created.CreatedAt.Time
+	pricing.UpdatedAt = created.UpdatedAt.Time
+	return nil
+}
+
+func (r *PostgresPricingRepository) Update(ctx context.Context, pricing *domain.ProviderPricing) error {
+	_, err := r.queries.UpdatePricing(ctx, db.UpdatePricingParams{
+		ID:                    uuidToPgtype(pricing.ID),
+		InputPricePerMillion:  floatToNumeric(pricing.InputPricePerMillion),
+		OutputPricePerMillion: floatToNumeric(pricing.OutputPricePerMillion),
+		ImagePrice:            floatPtrToNumeric(pricing.ImagePrice),
+		IsDefault:             pricing.IsDefault,
+	})
+	if err != nil {
+		return fmt.Errorf("update pricing: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresPricingRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	err := r.queries.DeletePricing(ctx, uuidToPgtype(id))
+	if err != nil {
+		return fmt.Errorf("delete pricing: %w", err)
+	}
+	return nil
+}
+
+func dbPricingToDomain(p *db.ProviderPricing) *domain.ProviderPricing {
+	var imagePrice *float64
+	if p.ImagePrice.Valid {
+		val := numericToFloat(p.ImagePrice)
+		imagePrice = &val
+	}
+
+	return &domain.ProviderPricing{
+		ID:                    pgtypeToUUID(p.ID),
+		Provider:              p.Provider,
+		Model:                 p.Model,
+		InputPricePerMillion:  numericToFloat(p.InputPricePerMillion),
+		OutputPricePerMillion: numericToFloat(p.OutputPricePerMillion),
+		ImagePrice:            imagePrice,
+		IsDefault:             p.IsDefault,
+		CreatedAt:             p.CreatedAt.Time,
+		UpdatedAt:             p.UpdatedAt.Time,
 	}
 }

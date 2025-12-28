@@ -95,3 +95,22 @@ func domainTenantToGraphQL(tenant *domain.Tenant) *Tenant {
 
 	return gqlTenant
 }
+
+// domainPricingToGraphQL converts a domain ProviderPricing to a GraphQL ProviderPricing
+func domainPricingToGraphQL(pricing *domain.ProviderPricing) *ProviderPricing {
+	if pricing == nil {
+		return nil
+	}
+
+	return &ProviderPricing{
+		ID:                    pricing.ID.String(),
+		Provider:              pricing.Provider,
+		Model:                 pricing.Model,
+		InputPricePerMillion:  pricing.InputPricePerMillion,
+		OutputPricePerMillion: pricing.OutputPricePerMillion,
+		ImagePrice:            pricing.ImagePrice,
+		IsDefault:             pricing.IsDefault,
+		CreatedAt:             pricing.CreatedAt,
+		UpdatedAt:             pricing.UpdatedAt,
+	}
+}

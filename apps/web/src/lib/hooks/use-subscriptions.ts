@@ -209,3 +209,80 @@ export function useJobStatusSubscription(
 
   return { unsubscribe }
 }
+
+// Usage subscription query
+const USAGE_UPDATED_SUBSCRIPTION = `
+  subscription UsageUpdated {
+    usageUpdated {
+      provider
+      totalTokensIn
+      totalTokensOut
+      totalCost
+      jobCount
+    }
+  }
+`
+
+interface UsageSummary {
+  provider: string
+  totalTokensIn: number
+  totalTokensOut: number
+  totalCost: number
+  jobCount: number
+}
+
+interface UsageSubscriptionOptions {
+  onUsageUpdate?: (usage: UsageSummary[]) => void
+  enabled?: boolean
+}
+
+/**
+ * Hook to subscribe to usage summary updates for the current tenant.
+ * Automatically updates the React Query cache when usage changes.
+ */
+export function useUsageSubscription(options: UsageSubscriptionOptions = {}) {
+  const { onUsageUpdate, enabled = true } = options
+  const queryClient = useQueryClient()
+  const unsubscribeRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const client = getWsClient()
+
+    const unsubscribe = client.subscribe<{ usageUpdated: UsageSummary[] }>(
+      { query: USAGE_UPDATED_SUBSCRIPTION },
+      {
+        next: (data) => {
+          if (data.data?.usageUpdated) {
+            console.log('[Subscription] Usage update received:', data.data.usageUpdated)
+
+            // Update the usage summary cache
+            queryClient.setQueryData(['usage', 'summary'], data.data.usageUpdated)
+
+            // Call the callback if provided
+            onUsageUpdate?.(data.data.usageUpdated)
+          }
+        },
+        error: (err) => {
+          console.error('[Subscription] Usage error:', err)
+        },
+        complete: () => {
+          console.log('[Subscription] Usage completed')
+        },
+      }
+    )
+
+    unsubscribeRef.current = unsubscribe
+
+    return () => {
+      unsubscribe()
+    }
+  }, [enabled, queryClient, onUsageUpdate])
+
+  const unsubscribe = useCallback(() => {
+    unsubscribeRef.current?.()
+  }, [])
+
+  return { unsubscribe }
+}

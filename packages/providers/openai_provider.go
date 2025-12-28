@@ -15,17 +15,19 @@ import (
 
 // OpenAIProvider implements AI provider using OpenAI API.
 type OpenAIProvider struct {
-	apiKey   string
-	model    string
-	endpoint string
-	client   *http.Client
+	apiKey         string
+	model          string
+	endpoint       string
+	client         *http.Client
+	pricingService *usecases.PricingService
 }
 
 // OpenAIConfig holds configuration for OpenAI provider.
 type OpenAIConfig struct {
-	APIKey   string
-	Model    string
-	Endpoint string
+	APIKey         string
+	Model          string
+	Endpoint       string
+	PricingService *usecases.PricingService
 }
 
 // NewOpenAIProvider creates a new OpenAI provider.
@@ -38,10 +40,11 @@ func NewOpenAIProvider(cfg OpenAIConfig) *OpenAIProvider {
 	}
 
 	return &OpenAIProvider{
-		apiKey:   cfg.APIKey,
-		model:    cfg.Model,
-		endpoint: cfg.Endpoint,
-		client:   &http.Client{},
+		apiKey:         cfg.APIKey,
+		model:          cfg.Model,
+		endpoint:       cfg.Endpoint,
+		client:         &http.Client{},
+		pricingService: cfg.PricingService,
 	}
 }
 
@@ -123,10 +126,20 @@ func (p *OpenAIProvider) Complete(ctx context.Context, request *usecases.Complet
 		return nil, fmt.Errorf("no response from OpenAI")
 	}
 
-	// Calculate cost (approximate pricing)
-	inputCost := float64(openAIResp.Usage.PromptTokens) * 0.00000015
-	outputCost := float64(openAIResp.Usage.CompletionTokens) * 0.0000006
-	totalCost := inputCost + outputCost
+	// Calculate cost using pricing service or fallback to defaults
+	var totalCost float64
+	if p.pricingService != nil {
+		cost, err := p.pricingService.CalculateCost(ctx, "openai", p.model, openAIResp.Usage.PromptTokens, openAIResp.Usage.CompletionTokens)
+		if err == nil {
+			totalCost = cost
+		}
+	}
+	if totalCost == 0 {
+		// Fallback to default pricing (gpt-4o-mini)
+		inputCost := float64(openAIResp.Usage.PromptTokens) * 0.00000015
+		outputCost := float64(openAIResp.Usage.CompletionTokens) * 0.0000006
+		totalCost = inputCost + outputCost
+	}
 
 	return &usecases.CompletionResponse{
 		Content:   openAIResp.Choices[0].Message.Content,
@@ -183,10 +196,22 @@ func (p *OpenAIProvider) GenerateImage(ctx context.Context, request *usecases.Im
 		return nil, fmt.Errorf("no image generated")
 	}
 
+	// Calculate image cost using pricing service or fallback to default
+	var imageCost float64
+	if p.pricingService != nil {
+		cost, err := p.pricingService.CalculateImageCost(ctx, "openai", "dall-e-3")
+		if err == nil && cost > 0 {
+			imageCost = cost
+		}
+	}
+	if imageCost == 0 {
+		imageCost = 0.04 // Fallback to DALL-E 3 standard pricing
+	}
+
 	return &usecases.ImageResponse{
 		URL:   result.Data[0].URL,
 		Model: "dall-e-3",
-		Cost:  0.04, // DALL-E 3 standard pricing
+		Cost:  imageCost,
 	}, nil
 }
 

@@ -122,6 +122,21 @@ func (ps *PubSub) HandleRedisUpdate(update *pubsub.JobUpdate) {
 	ps.Publish(update.TenantID, job)
 }
 
+// HandleRedisUpdateWithUsage converts a Redis update to a GraphQL Job and publishes it,
+// and also triggers usage update if job is completed.
+func (ps *PubSub) HandleRedisUpdateWithUsage(update *pubsub.JobUpdate, getUsage func(tenantID string) []*UsageSummary) {
+	ps.HandleRedisUpdate(update)
+
+	// If job completed or failed, notify usage subscribers
+	if update.Status == "completed" || update.Status == "failed" {
+		if UsagePubSub.HasSubscribers(update.TenantID) {
+			if usage := getUsage(update.TenantID); usage != nil {
+				UsagePubSub.Publish(update.TenantID, usage)
+			}
+		}
+	}
+}
+
 // convertJobStatus converts domain status (lowercase) to GraphQL status (UPPERCASE).
 func convertJobStatus(status string) JobStatus {
 	switch status {
@@ -152,3 +167,67 @@ func convertJobType(jobType string) JobType {
 
 // JobPubSub is the global pub/sub instance for job updates.
 var JobPubSub = NewPubSub()
+
+// UsagePubSubType manages usage update subscriptions.
+type UsagePubSubType struct {
+	mu          sync.RWMutex
+	subscribers map[string]map[chan []*UsageSummary]struct{}
+}
+
+// NewUsagePubSub creates a new UsagePubSub instance.
+func NewUsagePubSub() *UsagePubSubType {
+	return &UsagePubSubType{
+		subscribers: make(map[string]map[chan []*UsageSummary]struct{}),
+	}
+}
+
+// Subscribe adds a channel to receive usage updates for a tenant.
+func (ps *UsagePubSubType) Subscribe(tenantID string, ch chan []*UsageSummary) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if ps.subscribers[tenantID] == nil {
+		ps.subscribers[tenantID] = make(map[chan []*UsageSummary]struct{})
+	}
+	ps.subscribers[tenantID][ch] = struct{}{}
+}
+
+// Unsubscribe removes a subscription.
+func (ps *UsagePubSubType) Unsubscribe(tenantID string, ch chan []*UsageSummary) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	if subs, ok := ps.subscribers[tenantID]; ok {
+		delete(subs, ch)
+		if len(subs) == 0 {
+			delete(ps.subscribers, tenantID)
+		}
+	}
+}
+
+// Publish sends usage updates to all subscribers for that tenant.
+func (ps *UsagePubSubType) Publish(tenantID string, usage []*UsageSummary) {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+
+	if subs, ok := ps.subscribers[tenantID]; ok {
+		for ch := range subs {
+			select {
+			case ch <- usage:
+			default:
+				// Channel full, skip
+			}
+		}
+	}
+}
+
+// HasSubscribers checks if there are any subscribers for a tenant.
+func (ps *UsagePubSubType) HasSubscribers(tenantID string) bool {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	subs, ok := ps.subscribers[tenantID]
+	return ok && len(subs) > 0
+}
+
+// UsagePubSub is the global pub/sub instance for usage updates.
+var UsagePubSub = NewUsagePubSub()

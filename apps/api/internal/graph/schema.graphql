@@ -98,6 +98,19 @@ type UsageSummary {
   jobCount: Int!
 }
 
+# ProviderPricing represents pricing configuration for a provider model
+type ProviderPricing {
+  id: ID!
+  provider: String!
+  model: String!
+  inputPricePerMillion: Float!
+  outputPricePerMillion: Float!
+  imagePrice: Float
+  isDefault: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
 # Pagination info
 type PageInfo {
   totalCount: Int!
@@ -142,6 +155,23 @@ input NotificationSettingsInput {
   marketingEmails: Boolean
 }
 
+input CreatePricingInput {
+  provider: String!
+  model: String!
+  inputPricePerMillion: Float!
+  outputPricePerMillion: Float!
+  imagePrice: Float
+  isDefault: Boolean
+}
+
+input UpdatePricingInput {
+  id: ID!
+  inputPricePerMillion: Float!
+  outputPricePerMillion: Float!
+  imagePrice: Float
+  isDefault: Boolean
+}
+
 input JobsFilter {
   status: JobStatus
   type: JobType
@@ -168,6 +198,12 @@ type Query {
 
   # List available providers
   providers: [Provider!]!
+
+  # List all pricing configurations
+  pricingList: [ProviderPricing!]!
+
+  # List pricing for a specific provider
+  pricingByProvider(provider: String!): [ProviderPricing!]!
 }
 
 # Mutations
@@ -180,6 +216,15 @@ type Mutation {
 
   # Update current tenant settings
   updateTenant(input: UpdateTenantInput!): Tenant!
+
+  # Create a new pricing configuration
+  createPricing(input: CreatePricingInput!): ProviderPricing!
+
+  # Update an existing pricing configuration
+  updatePricing(input: UpdatePricingInput!): ProviderPricing!
+
+  # Delete a pricing configuration
+  deletePricing(id: ID!): Boolean!
 }
 
 # Subscriptions
@@ -189,4 +234,7 @@ type Subscription {
 
   # Subscribe to updates for a specific job
   jobStatusChanged(jobId: ID!): Job!
+
+  # Subscribe to usage summary updates for the current tenant
+  usageUpdated: [UsageSummary!]!
 }

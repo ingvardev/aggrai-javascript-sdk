@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Eye, EyeOff, Copy, RefreshCw, Trash2, Info } from 'lucide-react'
 import { useProviders } from '@/lib/hooks'
+import { getProviderDisplayName } from '@/lib/utils'
 import { toast } from 'sonner'
 
 interface ApiKey {
@@ -131,8 +132,8 @@ export function ApiKeysSettings() {
                   <div className="flex items-center gap-3">
                     <div className={`h-2 w-2 rounded-full ${provider.enabled ? 'bg-green-500' : 'bg-red-500'}`} />
                     <div>
-                      <p className="font-medium">{provider.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{provider.type}</p>
+                      <p className="font-medium">{getProviderDisplayName(provider.name)}</p>
+                      <p className="text-xs text-muted-foreground">{getProviderDisplayName(provider.type)}</p>
                     </div>
                   </div>
                   <Badge variant={provider.enabled ? 'default' : 'secondary'}>

@@ -13,13 +13,18 @@ import (
 type Querier interface {
 	CountJobsByTenant(ctx context.Context, tenantID pgtype.UUID) (int64, error)
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
+	CreatePricing(ctx context.Context, arg CreatePricingParams) (ProviderPricing, error)
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (Provider, error)
 	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
 	CreateUsage(ctx context.Context, arg CreateUsageParams) (Usage, error)
 	DeleteJob(ctx context.Context, id pgtype.UUID) error
+	DeletePricing(ctx context.Context, id pgtype.UUID) error
 	DeleteProvider(ctx context.Context, id pgtype.UUID) error
 	DeleteTenant(ctx context.Context, id pgtype.UUID) error
+	GetDefaultPricingByProvider(ctx context.Context, provider string) (ProviderPricing, error)
 	GetJob(ctx context.Context, id pgtype.UUID) (Job, error)
+	GetPricing(ctx context.Context, id pgtype.UUID) (ProviderPricing, error)
+	GetPricingByProviderModel(ctx context.Context, arg GetPricingByProviderModelParams) (ProviderPricing, error)
 	GetProvider(ctx context.Context, id pgtype.UUID) (Provider, error)
 	GetProviderByName(ctx context.Context, name string) (Provider, error)
 	GetTenant(ctx context.Context, id pgtype.UUID) (Tenant, error)
@@ -31,10 +36,14 @@ type Querier interface {
 	ListEnabledProviders(ctx context.Context) ([]Provider, error)
 	ListJobsByStatus(ctx context.Context, arg ListJobsByStatusParams) ([]Job, error)
 	ListJobsByTenant(ctx context.Context, arg ListJobsByTenantParams) ([]Job, error)
+	ListPricing(ctx context.Context) ([]ProviderPricing, error)
+	ListPricingByProvider(ctx context.Context, provider string) ([]ProviderPricing, error)
 	ListProviders(ctx context.Context) ([]Provider, error)
 	ListTenants(ctx context.Context, arg ListTenantsParams) ([]Tenant, error)
 	ListUsageByTenant(ctx context.Context, arg ListUsageByTenantParams) ([]Usage, error)
+	SetDefaultPricing(ctx context.Context, arg SetDefaultPricingParams) error
 	UpdateJob(ctx context.Context, arg UpdateJobParams) (Job, error)
+	UpdatePricing(ctx context.Context, arg UpdatePricingParams) (ProviderPricing, error)
 	UpdateProvider(ctx context.Context, arg UpdateProviderParams) (Provider, error)
 	UpdateTenant(ctx context.Context, arg UpdateTenantParams) (Tenant, error)
 }

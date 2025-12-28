@@ -45,3 +45,15 @@ type UsageRepository interface {
 	GetByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*domain.Usage, error)
 	GetSummary(ctx context.Context, tenantID uuid.UUID) ([]*domain.UsageSummary, error)
 }
+
+// PricingRepository defines the interface for provider pricing persistence.
+type PricingRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.ProviderPricing, error)
+	GetByProviderModel(ctx context.Context, provider, model string) (*domain.ProviderPricing, error)
+	GetDefaultByProvider(ctx context.Context, provider string) (*domain.ProviderPricing, error)
+	List(ctx context.Context) ([]*domain.ProviderPricing, error)
+	ListByProvider(ctx context.Context, provider string) ([]*domain.ProviderPricing, error)
+	Create(ctx context.Context, pricing *domain.ProviderPricing) error
+	Update(ctx context.Context, pricing *domain.ProviderPricing) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}

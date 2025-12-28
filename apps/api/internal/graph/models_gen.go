@@ -15,6 +15,15 @@ type CreateJobInput struct {
 	Input string  `json:"input"`
 }
 
+type CreatePricingInput struct {
+	Provider              string   `json:"provider"`
+	Model                 string   `json:"model"`
+	InputPricePerMillion  float64  `json:"inputPricePerMillion"`
+	OutputPricePerMillion float64  `json:"outputPricePerMillion"`
+	ImagePrice            *float64 `json:"imagePrice,omitempty"`
+	IsDefault             *bool    `json:"isDefault,omitempty"`
+}
+
 type Job struct {
 	ID         string     `json:"id"`
 	TenantID   string     `json:"tenantId"`
@@ -88,6 +97,18 @@ type Provider struct {
 	Priority int          `json:"priority"`
 }
 
+type ProviderPricing struct {
+	ID                    string    `json:"id"`
+	Provider              string    `json:"provider"`
+	Model                 string    `json:"model"`
+	InputPricePerMillion  float64   `json:"inputPricePerMillion"`
+	OutputPricePerMillion float64   `json:"outputPricePerMillion"`
+	ImagePrice            *float64  `json:"imagePrice,omitempty"`
+	IsDefault             bool      `json:"isDefault"`
+	CreatedAt             time.Time `json:"createdAt"`
+	UpdatedAt             time.Time `json:"updatedAt"`
+}
+
 type Query struct {
 }
 
@@ -112,6 +133,14 @@ type TenantSettings struct {
 type TenantSettingsInput struct {
 	DarkMode      *bool                      `json:"darkMode,omitempty"`
 	Notifications *NotificationSettingsInput `json:"notifications,omitempty"`
+}
+
+type UpdatePricingInput struct {
+	ID                    string   `json:"id"`
+	InputPricePerMillion  float64  `json:"inputPricePerMillion"`
+	OutputPricePerMillion float64  `json:"outputPricePerMillion"`
+	ImagePrice            *float64 `json:"imagePrice,omitempty"`
+	IsDefault             *bool    `json:"isDefault,omitempty"`
 }
 
 type UpdateTenantInput struct {

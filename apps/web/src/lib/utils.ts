@@ -42,3 +42,16 @@ export function truncate(str: string, length: number): string {
   if (str.length <= length) return str
   return str.slice(0, length) + '...'
 }
+
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  openai: 'OpenAI',
+  claude: 'Claude (Anthropic)',
+  'stub-provider': 'Test Provider',
+  'stub': 'Test Provider',
+  ollama: 'Ollama (Local)',
+  local: 'Local Model',
+}
+
+export function getProviderDisplayName(provider: string): string {
+  return PROVIDER_DISPLAY_NAMES[provider.toLowerCase()] || provider
+}

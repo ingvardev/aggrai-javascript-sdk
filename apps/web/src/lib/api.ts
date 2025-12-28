@@ -117,6 +117,18 @@ export const USAGE_SUMMARY_QUERY = `
   }
 `
 
+export const USAGE_UPDATED_SUBSCRIPTION = `
+  subscription UsageUpdated {
+    usageUpdated {
+      provider
+      totalTokensIn
+      totalTokensOut
+      totalCost
+      jobCount
+    }
+  }
+`
+
 export const CREATE_JOB_MUTATION = `
   mutation CreateJob($input: CreateJobInput!) {
     createJob(input: $input) {
@@ -199,5 +211,88 @@ export const UPDATE_TENANT_MUTATION = `
       createdAt
       updatedAt
     }
+  }
+`
+
+// Pricing types
+export interface ProviderPricing {
+  id: string
+  provider: string
+  model: string
+  inputPricePerMillion: number
+  outputPricePerMillion: number
+  imagePrice: number | null
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export const PRICING_LIST_QUERY = `
+  query PricingList {
+    pricingList {
+      id
+      provider
+      model
+      inputPricePerMillion
+      outputPricePerMillion
+      imagePrice
+      isDefault
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const PRICING_BY_PROVIDER_QUERY = `
+  query PricingByProvider($provider: String!) {
+    pricingByProvider(provider: $provider) {
+      id
+      provider
+      model
+      inputPricePerMillion
+      outputPricePerMillion
+      imagePrice
+      isDefault
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const CREATE_PRICING_MUTATION = `
+  mutation CreatePricing($input: CreatePricingInput!) {
+    createPricing(input: $input) {
+      id
+      provider
+      model
+      inputPricePerMillion
+      outputPricePerMillion
+      imagePrice
+      isDefault
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const UPDATE_PRICING_MUTATION = `
+  mutation UpdatePricing($id: ID!, $input: UpdatePricingInput!) {
+    updatePricing(id: $id, input: $input) {
+      id
+      provider
+      model
+      inputPricePerMillion
+      outputPricePerMillion
+      imagePrice
+      isDefault
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const DELETE_PRICING_MUTATION = `
+  mutation DeletePricing($id: ID!) {
+    deletePricing(id: $id)
   }
 `

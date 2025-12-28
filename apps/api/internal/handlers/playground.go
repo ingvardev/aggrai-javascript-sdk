@@ -10,7 +10,7 @@ const playgroundTemplate = `<!DOCTYPE html>
 <html>
 <head>
   <title>AI Aggregator - GraphQL Playground</title>
-  <link rel="stylesheet" href="https://unpkg.com/graphiql/graphiql.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/graphiql@3.0.10/graphiql.min.css" />
   <style>
     body {
       height: 100%;
@@ -25,9 +25,9 @@ const playgroundTemplate = `<!DOCTYPE html>
 </head>
 <body>
   <div id="graphiql">Loading...</div>
-  <script crossorigin src="https://unpkg.com/react/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/graphiql/graphiql.min.js"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/graphiql@3.0.10/graphiql.min.js"></script>
   <script>
     const fetcher = GraphiQL.createFetcher({
       url: '{{.Endpoint}}',
@@ -36,10 +36,8 @@ const playgroundTemplate = `<!DOCTYPE html>
       }
     });
 
-    ReactDOM.render(
-      React.createElement(GraphiQL, { fetcher: fetcher }),
-      document.getElementById('graphiql'),
-    );
+    const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+    root.render(React.createElement(GraphiQL, { fetcher: fetcher }));
   </script>
 </body>
 </html>`
