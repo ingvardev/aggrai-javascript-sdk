@@ -14,6 +14,8 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-react'
+import { useCreateJob } from '@/lib/hooks'
+import { toast } from 'sonner'
 
 interface CreateJobDialogProps {
   children: React.ReactNode
@@ -21,20 +23,31 @@ interface CreateJobDialogProps {
 
 export function CreateJobDialog({ children }: CreateJobDialogProps) {
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [input, setInput] = useState('')
   const [type, setType] = useState<'TEXT' | 'IMAGE'>('TEXT')
+  const createJob = useCreateJob()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    setLoading(false)
-    setOpen(false)
-    setInput('')
+    try {
+      const job = await createJob.mutateAsync({ type, input })
+      setOpen(false)
+      setInput('')
+      setType('TEXT')
+      toast.success('Job created successfully', {
+        description: `Job ID: ${job.id.slice(0, 8)}...`,
+        action: {
+          label: 'View',
+          onClick: () => window.location.href = `/jobs/${job.id}`,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to create job:', error)
+      toast.error('Failed to create job', {
+        description: 'Check if the API server is running.',
+      })
+    }
   }
 
   return (
@@ -86,6 +99,11 @@ export function CreateJobDialog({ children }: CreateJobDialogProps) {
                 required
               />
             </div>
+            {createJob.error && (
+              <p className="text-sm text-destructive">
+                Failed to create job. Check if the API is running.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -95,8 +113,8 @@ export function CreateJobDialog({ children }: CreateJobDialogProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !input.trim()}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={createJob.isPending || !input.trim()}>
+              {createJob.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create Job
             </Button>
           </DialogFooter>

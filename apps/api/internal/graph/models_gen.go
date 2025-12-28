@@ -10,13 +10,11 @@ import (
 	"time"
 )
 
-// CreateJobInput represents input for creating a job
 type CreateJobInput struct {
 	Type  JobType `json:"type"`
 	Input string  `json:"input"`
 }
 
-// Job represents an AI processing request
 type Job struct {
 	ID         string     `json:"id"`
 	TenantID   string     `json:"tenantId"`
@@ -35,19 +33,16 @@ type Job struct {
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 }
 
-// JobConnection represents a paginated list of jobs
 type JobConnection struct {
 	Edges    []*JobEdge `json:"edges"`
 	PageInfo *PageInfo  `json:"pageInfo"`
 }
 
-// JobEdge represents an edge in the job connection
 type JobEdge struct {
 	Node   *Job   `json:"node"`
 	Cursor string `json:"cursor"`
 }
 
-// JobsFilter represents filter options for jobs
 type JobsFilter struct {
 	Status *JobStatus `json:"status,omitempty"`
 	Type   *JobType   `json:"type,omitempty"`
@@ -56,20 +51,17 @@ type JobsFilter struct {
 type Mutation struct {
 }
 
-// PageInfo contains pagination information
 type PageInfo struct {
 	TotalCount      int  `json:"totalCount"`
 	HasNextPage     bool `json:"hasNextPage"`
 	HasPreviousPage bool `json:"hasPreviousPage"`
 }
 
-// PaginationInput represents pagination options
 type PaginationInput struct {
 	Limit  *int `json:"limit,omitempty"`
 	Offset *int `json:"offset,omitempty"`
 }
 
-// Provider represents an AI provider
 type Provider struct {
 	ID       string       `json:"id"`
 	Name     string       `json:"name"`
@@ -81,7 +73,9 @@ type Provider struct {
 type Query struct {
 }
 
-// Tenant represents an organization with API access
+type Subscription struct {
+}
+
 type Tenant struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -90,7 +84,6 @@ type Tenant struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// Usage represents resource consumption
 type Usage struct {
 	ID        string    `json:"id"`
 	TenantID  string    `json:"tenantId"`
@@ -103,7 +96,6 @@ type Usage struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-// UsageSummary represents aggregated usage statistics
 type UsageSummary struct {
 	Provider       string  `json:"provider"`
 	TotalTokensIn  int     `json:"totalTokensIn"`
@@ -112,7 +104,6 @@ type UsageSummary struct {
 	JobCount       int     `json:"jobCount"`
 }
 
-// JobStatus represents the current state of a job
 type JobStatus string
 
 const (
@@ -172,7 +163,6 @@ func (e JobStatus) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// JobType defines the type of AI request
 type JobType string
 
 const (
@@ -228,7 +218,6 @@ func (e JobType) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ProviderType defines the type of AI provider
 type ProviderType string
 
 const (

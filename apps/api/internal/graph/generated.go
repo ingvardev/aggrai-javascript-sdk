@@ -5,6 +5,7 @@ package graph
 import (
 	"bytes"
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"strconv"
@@ -40,6 +41,7 @@ type Config struct {
 type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -101,6 +103,11 @@ type ComplexityRoot struct {
 		UsageSummary func(childComplexity int) int
 	}
 
+	Subscription struct {
+		JobStatusChanged func(childComplexity int, jobID string) int
+		JobUpdated       func(childComplexity int) int
+	}
+
 	Tenant struct {
 		Active    func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
@@ -140,6 +147,10 @@ type QueryResolver interface {
 	Jobs(ctx context.Context, filter *JobsFilter, pagination *PaginationInput) (*JobConnection, error)
 	UsageSummary(ctx context.Context) ([]*UsageSummary, error)
 	Providers(ctx context.Context) ([]*Provider, error)
+}
+type SubscriptionResolver interface {
+	JobUpdated(ctx context.Context) (<-chan *Job, error)
+	JobStatusChanged(ctx context.Context, jobID string) (<-chan *Job, error)
 }
 
 type executableSchema struct {
@@ -392,6 +403,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.UsageSummary(childComplexity), true
 
+	case "Subscription.jobStatusChanged":
+		if e.complexity.Subscription.JobStatusChanged == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_jobStatusChanged_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.JobStatusChanged(childComplexity, args["jobId"].(string)), true
+	case "Subscription.jobUpdated":
+		if e.complexity.Subscription.JobUpdated == nil {
+			break
+		}
+
+		return e.complexity.Subscription.JobUpdated(childComplexity), true
+
 	case "Tenant.active":
 		if e.complexity.Tenant.Active == nil {
 			break
@@ -569,6 +598,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				Data: buf.Bytes(),
 			}
 		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
 
 	default:
 		return graphql.OneShot(graphql.ErrorResponse(ctx, "unsupported GraphQL operation"))
@@ -616,199 +662,19 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
+//go:embed "schema.graphql"
+var sourcesFS embed.FS
+
+func sourceData(filename string) string {
+	data, err := sourcesFS.ReadFile(filename)
+	if err != nil {
+		panic(fmt.Sprintf("codegen problem: %s not available", filename))
+	}
+	return string(data)
+}
+
 var sources = []*ast.Source{
-	{Name: "../../schema.graphqls", Input: `# GraphQL Schema for AI Aggregator API
-
-"""
-Job represents an AI processing request
-"""
-type Job {
-  id: ID!
-  tenantId: ID!
-  type: JobType!
-  input: String!
-  status: JobStatus!
-  result: String
-  error: String
-  provider: String
-  tokensIn: Int!
-  tokensOut: Int!
-  cost: Float!
-  createdAt: Time!
-  updatedAt: Time!
-  startedAt: Time
-  finishedAt: Time
-}
-
-"""
-JobType defines the type of AI request
-"""
-enum JobType {
-  TEXT
-  IMAGE
-}
-
-"""
-JobStatus represents the current state of a job
-"""
-enum JobStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-"""
-Tenant represents an organization with API access
-"""
-type Tenant {
-  id: ID!
-  name: String!
-  active: Boolean!
-  createdAt: Time!
-  updatedAt: Time!
-}
-
-"""
-Provider represents an AI provider
-"""
-type Provider {
-  id: ID!
-  name: String!
-  type: ProviderType!
-  enabled: Boolean!
-  priority: Int!
-}
-
-"""
-ProviderType defines the type of AI provider
-"""
-enum ProviderType {
-  OPENAI
-  CLAUDE
-  LOCAL
-  OLLAMA
-}
-
-"""
-Usage represents resource consumption
-"""
-type Usage {
-  id: ID!
-  tenantId: ID!
-  jobId: ID!
-  provider: String!
-  model: String
-  tokensIn: Int!
-  tokensOut: Int!
-  cost: Float!
-  createdAt: Time!
-}
-
-"""
-UsageSummary represents aggregated usage statistics
-"""
-type UsageSummary {
-  provider: String!
-  totalTokensIn: Int!
-  totalTokensOut: Int!
-  totalCost: Float!
-  jobCount: Int!
-}
-
-"""
-PageInfo contains pagination information
-"""
-type PageInfo {
-  totalCount: Int!
-  hasNextPage: Boolean!
-  hasPreviousPage: Boolean!
-}
-
-"""
-JobConnection represents a paginated list of jobs
-"""
-type JobConnection {
-  edges: [JobEdge!]!
-  pageInfo: PageInfo!
-}
-
-"""
-JobEdge represents an edge in the job connection
-"""
-type JobEdge {
-  node: Job!
-  cursor: String!
-}
-
-"""
-CreateJobInput represents input for creating a job
-"""
-input CreateJobInput {
-  type: JobType!
-  input: String!
-}
-
-"""
-JobsFilter represents filter options for jobs
-"""
-input JobsFilter {
-  status: JobStatus
-  type: JobType
-}
-
-"""
-PaginationInput represents pagination options
-"""
-input PaginationInput {
-  limit: Int
-  offset: Int
-}
-
-"""
-Custom scalar for timestamps
-"""
-scalar Time
-
-type Query {
-  """
-  Returns the authenticated tenant
-  """
-  me: Tenant
-
-  """
-  Get a job by ID
-  """
-  job(id: ID!): Job
-
-  """
-  List jobs with optional filtering and pagination
-  """
-  jobs(filter: JobsFilter, pagination: PaginationInput): JobConnection!
-
-  """
-  Get usage summary grouped by provider
-  """
-  usageSummary: [UsageSummary!]!
-
-  """
-  List available AI providers
-  """
-  providers: [Provider!]!
-}
-
-type Mutation {
-  """
-  Create a new AI processing job
-  """
-  createJob(input: CreateJobInput!): Job!
-
-  """
-  Cancel a pending job
-  """
-  cancelJob(id: ID!): Job
-}
-`, BuiltIn: false},
+	{Name: "schema.graphql", Input: sourceData("schema.graphql"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
@@ -873,6 +739,17 @@ func (ec *executionContext) field_Query_jobs_args(ctx context.Context, rawArgs m
 		return nil, err
 	}
 	args["pagination"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_jobStatusChanged_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "jobId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["jobId"] = arg0
 	return args, nil
 }
 
@@ -2250,6 +2127,140 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_jobUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_jobUpdated,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Subscription().JobUpdated(ctx)
+		},
+		nil,
+		ec.marshalNJob2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐJob,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_jobUpdated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Job_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_Job_tenantId(ctx, field)
+			case "type":
+				return ec.fieldContext_Job_type(ctx, field)
+			case "input":
+				return ec.fieldContext_Job_input(ctx, field)
+			case "status":
+				return ec.fieldContext_Job_status(ctx, field)
+			case "result":
+				return ec.fieldContext_Job_result(ctx, field)
+			case "error":
+				return ec.fieldContext_Job_error(ctx, field)
+			case "provider":
+				return ec.fieldContext_Job_provider(ctx, field)
+			case "tokensIn":
+				return ec.fieldContext_Job_tokensIn(ctx, field)
+			case "tokensOut":
+				return ec.fieldContext_Job_tokensOut(ctx, field)
+			case "cost":
+				return ec.fieldContext_Job_cost(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Job_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Job_updatedAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_Job_startedAt(ctx, field)
+			case "finishedAt":
+				return ec.fieldContext_Job_finishedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_jobStatusChanged(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_jobStatusChanged,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().JobStatusChanged(ctx, fc.Args["jobId"].(string))
+		},
+		nil,
+		ec.marshalNJob2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐJob,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_jobStatusChanged(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Job_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_Job_tenantId(ctx, field)
+			case "type":
+				return ec.fieldContext_Job_type(ctx, field)
+			case "input":
+				return ec.fieldContext_Job_input(ctx, field)
+			case "status":
+				return ec.fieldContext_Job_status(ctx, field)
+			case "result":
+				return ec.fieldContext_Job_result(ctx, field)
+			case "error":
+				return ec.fieldContext_Job_error(ctx, field)
+			case "provider":
+				return ec.fieldContext_Job_provider(ctx, field)
+			case "tokensIn":
+				return ec.fieldContext_Job_tokensIn(ctx, field)
+			case "tokensOut":
+				return ec.fieldContext_Job_tokensOut(ctx, field)
+			case "cost":
+				return ec.fieldContext_Job_cost(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Job_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Job_updatedAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_Job_startedAt(ctx, field)
+			case "finishedAt":
+				return ec.fieldContext_Job_finishedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_jobStatusChanged_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -4326,6 +4337,13 @@ func (ec *executionContext) unmarshalInputPaginationInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
+	if _, present := asMap["limit"]; !present {
+		asMap["limit"] = 20
+	}
+	if _, present := asMap["offset"]; !present {
+		asMap["offset"] = 0
+	}
+
 	fieldsInOrder := [...]string{"limit", "offset"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
@@ -4856,6 +4874,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	}
 
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "jobUpdated":
+		return ec._Subscription_jobUpdated(ctx, fields[0])
+	case "jobStatusChanged":
+		return ec._Subscription_jobStatusChanged(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var tenantImplementors = []string{"Tenant"}

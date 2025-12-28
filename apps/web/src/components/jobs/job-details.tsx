@@ -11,7 +11,10 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { formatDate, formatCurrency, formatNumber } from '@/lib/utils'
-import { ArrowLeft, Copy, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Copy, RefreshCw, Loader2, AlertCircle, Wifi } from 'lucide-react'
+import { useJob } from '@/lib/hooks'
+import { useJobStatusSubscription } from '@/lib/hooks/use-subscriptions'
+import { toast } from 'sonner'
 
 interface JobDetailsProps {
   jobId: string
@@ -25,25 +28,57 @@ const statusVariant = {
 } as const
 
 export function JobDetails({ jobId }: JobDetailsProps) {
-  // Mock job data
-  const job = {
-    id: jobId,
-    type: 'TEXT',
-    input: 'Explain quantum computing in simple terms that a beginner can understand. Include examples of real-world applications.',
-    status: 'COMPLETED',
-    result: 'Quantum computing is a revolutionary approach to computation that harnesses the principles of quantum mechanics. Unlike classical computers that use bits (0s and 1s), quantum computers use quantum bits or "qubits" that can exist in multiple states simultaneously through a phenomenon called superposition.\n\nImagine a coin spinning in the air - before it lands, it\'s effectively both heads and tails at the same time. This is similar to how qubits work. Additionally, qubits can be "entangled," meaning the state of one qubit instantly affects another, regardless of distance.\n\nReal-world applications include:\n1. Drug discovery - simulating molecular interactions\n2. Cryptography - breaking and creating secure codes\n3. Financial modeling - complex risk analysis\n4. Climate modeling - more accurate predictions\n5. Optimization problems - logistics and supply chains',
-    provider: 'stub-provider',
-    tokensIn: 25,
-    tokensOut: 180,
-    cost: 0.00205,
-    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 29 * 60 * 1000).toISOString(),
-    startedAt: new Date(Date.now() - 30 * 60 * 1000 + 100).toISOString(),
-    finishedAt: new Date(Date.now() - 29 * 60 * 1000).toISOString(),
-  }
+  const { data: job, isLoading, error } = useJob(jobId)
+
+  // Subscribe to real-time updates for this specific job
+  useJobStatusSubscription(jobId, {
+    enabled: !!jobId,
+    onJobUpdate: (updatedJob) => {
+      if (updatedJob.status === 'COMPLETED') {
+        toast.success('Job completed!', {
+          description: 'The AI has finished processing your request.',
+        })
+      } else if (updatedJob.status === 'FAILED') {
+        toast.error('Job failed', {
+          description: updatedJob.error || 'An error occurred',
+        })
+      }
+    },
+  })
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error || !job) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/jobs">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-semibold tracking-tight">Job Not Found</h1>
+        </div>
+        <Card>
+          <CardContent className="flex items-center gap-3 py-8">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <p className="text-muted-foreground">
+              Could not load job details. The job may not exist or the API is unavailable.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -62,7 +97,7 @@ export function JobDetails({ jobId }: JobDetailsProps) {
           </p>
         </div>
         <Badge
-          variant={statusVariant[job.status as keyof typeof statusVariant]}
+          variant={statusVariant[job.status]}
           className="text-sm"
         >
           {job.status}
@@ -103,13 +138,25 @@ export function JobDetails({ jobId }: JobDetailsProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => copyToClipboard(job.result)}
+                  onClick={() => copyToClipboard(job.result!)}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap">{job.result}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Error */}
+          {job.error && (
+            <Card className="border-destructive">
+              <CardHeader>
+                <CardTitle className="text-base text-destructive">Error</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-destructive whitespace-pre-wrap">{job.error}</p>
               </CardContent>
             </Card>
           )}
@@ -129,7 +176,7 @@ export function JobDetails({ jobId }: JobDetailsProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Provider</span>
-                <span className="text-sm font-medium">{job.provider}</span>
+                <span className="text-sm font-medium">{job.provider || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Created</span>

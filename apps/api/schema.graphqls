@@ -189,3 +189,15 @@ type Mutation {
   """
   cancelJob(id: ID!): Job
 }
+
+type Subscription {
+  """
+  Subscribe to job status updates for the current tenant
+  """
+  jobUpdated: Job!
+
+  """
+  Subscribe to updates for a specific job
+  """
+  jobStatusChanged(jobId: ID!): Job!
+}

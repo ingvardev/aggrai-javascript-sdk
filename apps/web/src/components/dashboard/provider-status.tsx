@@ -1,70 +1,67 @@
+'use client'
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Cpu, Cloud, Server } from 'lucide-react'
+import { Cpu, Cloud, Server, Loader2 } from 'lucide-react'
+import { useProviders } from '@/lib/hooks'
 
-const providers = [
-  {
-    name: 'OpenAI',
-    type: 'openai',
-    status: 'online',
-    latency: '145ms',
-    icon: Cloud,
-  },
-  {
-    name: 'Claude',
-    type: 'claude',
-    status: 'online',
-    latency: '198ms',
-    icon: Cloud,
-  },
-  {
-    name: 'Stub Provider',
-    type: 'local',
-    status: 'online',
-    latency: '12ms',
-    icon: Server,
-  },
-  {
-    name: 'Ollama',
-    type: 'ollama',
-    status: 'offline',
-    latency: '-',
-    icon: Cpu,
-  },
-]
+const providerIcons: Record<string, typeof Cloud> = {
+  OPENAI: Cloud,
+  CLAUDE: Cloud,
+  OLLAMA: Cpu,
+  LOCAL: Server,
+}
 
 export function ProviderStatus() {
+  const { data: providers, isLoading, error } = useProviders()
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Provider Status</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {providers.map((provider) => (
-            <div
-              key={provider.name}
-              className="flex items-center justify-between rounded-lg border p-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <provider.icon className="h-5 w-5" />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Failed to load providers
+          </div>
+        ) : providers?.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            No providers configured
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {providers?.map((provider) => {
+              const Icon = providerIcons[provider.type] || Server
+
+              return (
+                <div
+                  key={provider.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{provider.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Priority: {provider.priority}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={provider.enabled ? 'success' : 'secondary'}>
+                    {provider.enabled ? 'enabled' : 'disabled'}
+                  </Badge>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">{provider.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Latency: {provider.latency}
-                  </p>
-                </div>
-              </div>
-              <Badge
-                variant={provider.status === 'online' ? 'success' : 'secondary'}
-              >
-                {provider.status}
-              </Badge>
-            </div>
-          ))}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

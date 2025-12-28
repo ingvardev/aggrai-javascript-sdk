@@ -14,6 +14,7 @@ resolver:
   dir: internal/graph
   package: graph
   filename_template: "{name}.resolvers.go"
+  omit_template_comment: false
 
 autobind:
   - github.com/ingvar/aiaggregator/apps/api/internal/graph
@@ -21,13 +22,13 @@ autobind:
 models:
   ID:
     model:
-      - github.com/google/uuid.UUID
+      - github.com/99designs/gqlgen/graphql.ID
   UUID:
     model:
-      - github.com/google/uuid.UUID
+      - github.com/99designs/gqlgen/graphql.ID
   Time:
     model:
-      - time.Time
+      - github.com/99designs/gqlgen/graphql.Time
   Int:
     model:
       - github.com/99designs/gqlgen/graphql.Int

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ingvar/aiaggregator/packages/domain"
+	"github.com/ingvar/aiaggregator/packages/pubsub"
 )
 
 // ProcessJobService handles job processing logic.
@@ -14,6 +15,7 @@ type ProcessJobService struct {
 	jobRepo    JobRepository
 	usageRepo  UsageRepository
 	providerFn func(name string) (AIProvider, bool)
+	publisher  *pubsub.Publisher
 }
 
 // NewProcessJobService creates a new process job service.
@@ -29,6 +31,41 @@ func NewProcessJobService(
 	}
 }
 
+// SetPublisher sets the Redis publisher for job updates.
+func (s *ProcessJobService) SetPublisher(publisher *pubsub.Publisher) {
+	s.publisher = publisher
+}
+
+// publishUpdate publishes a job update event via Redis.
+func (s *ProcessJobService) publishUpdate(ctx context.Context, job *domain.Job) {
+	if s.publisher == nil {
+		return
+	}
+
+	update := &pubsub.JobUpdate{
+		JobID:      job.ID.String(),
+		TenantID:   job.TenantID.String(),
+		Type:       string(job.Type),
+		Input:      job.Input,
+		Status:     string(job.Status),
+		Result:     job.Result,
+		Error:      job.Error,
+		Provider:   job.Provider,
+		TokensIn:   job.TokensIn,
+		TokensOut:  job.TokensOut,
+		Cost:       job.Cost,
+		CreatedAt:  job.CreatedAt,
+		UpdatedAt:  job.UpdatedAt,
+		StartedAt:  job.StartedAt,
+		FinishedAt: job.FinishedAt,
+	}
+
+	// Fire and forget - don't block on publish errors
+	go func() {
+		_ = s.publisher.Publish(context.Background(), update)
+	}()
+}
+
 // ProcessJob processes a job with the specified provider.
 func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID, providerName string) error {
 	job, err := s.jobRepo.GetByID(ctx, jobID)
@@ -40,13 +77,17 @@ func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID, pro
 	provider, ok := s.providerFn(providerName)
 	if !ok {
 		job.MarkFailed("provider not found: " + providerName)
-		return s.jobRepo.Update(ctx, job)
+		_ = s.jobRepo.Update(ctx, job)
+		s.publishUpdate(ctx, job)
+		return nil
 	}
 
 	// Check provider availability
 	if !provider.IsAvailable(ctx) {
 		job.MarkFailed("provider not available: " + providerName)
-		return s.jobRepo.Update(ctx, job)
+		_ = s.jobRepo.Update(ctx, job)
+		s.publishUpdate(ctx, job)
+		return nil
 	}
 
 	// Mark job as processing
@@ -54,12 +95,15 @@ func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID, pro
 	if err := s.jobRepo.Update(ctx, job); err != nil {
 		return err
 	}
+	s.publishUpdate(ctx, job) // Notify: PROCESSING
 
 	// Execute the job
 	result, err := provider.Execute(ctx, job)
 	if err != nil {
 		job.MarkFailed(err.Error())
-		return s.jobRepo.Update(ctx, job)
+		_ = s.jobRepo.Update(ctx, job)
+		s.publishUpdate(ctx, job) // Notify: FAILED
+		return nil
 	}
 
 	// Mark job as completed
@@ -67,6 +111,7 @@ func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID, pro
 	if err := s.jobRepo.Update(ctx, job); err != nil {
 		return err
 	}
+	s.publishUpdate(ctx, job) // Notify: COMPLETED
 
 	// Record usage
 	usage := &domain.Usage{

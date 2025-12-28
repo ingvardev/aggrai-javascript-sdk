@@ -73,7 +73,7 @@ export const JOBS_QUERY = `
 `
 
 export const JOB_QUERY = `
-  query Job($id: UUID!) {
+  query Job($id: ID!) {
     job(id: $id) {
       id
       type
@@ -125,6 +125,27 @@ export const CREATE_JOB_MUTATION = `
       input
       status
       createdAt
+    }
+  }
+`
+
+// Tenant types
+export interface Tenant {
+  id: string
+  name: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export const ME_QUERY = `
+  query Me {
+    me {
+      id
+      name
+      active
+      createdAt
+      updatedAt
     }
   }
 `

@@ -21,6 +21,7 @@ import (
 	appMiddleware "github.com/ingvar/aiaggregator/apps/api/internal/middleware"
 	"github.com/ingvar/aiaggregator/packages/adapters"
 	"github.com/ingvar/aiaggregator/packages/providers"
+	"github.com/ingvar/aiaggregator/packages/pubsub"
 	"github.com/ingvar/aiaggregator/packages/queue"
 	"github.com/ingvar/aiaggregator/packages/shared"
 	"github.com/ingvar/aiaggregator/packages/usecases"
@@ -81,6 +82,32 @@ func main() {
 		jobQueue = q
 		defer q.Close()
 		log.Info().Msg("Connected to Redis")
+	}
+
+	// Initialize Redis subscriber for job updates (for GraphQL subscriptions)
+	subscriber, err := pubsub.NewSubscriber(cfg.RedisURL)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to create Redis subscriber, subscriptions will not receive updates")
+	} else {
+		defer subscriber.Close()
+
+		// Start listening for job updates
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		updates, err := subscriber.Subscribe(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to subscribe to job updates")
+		} else {
+			log.Info().Msg("Subscribed to Redis for job updates")
+
+			// Forward Redis updates to GraphQL subscriptions
+			go func() {
+				for update := range updates {
+					graph.JobPubSub.HandleRedisUpdate(update)
+				}
+			}()
+		}
 	}
 
 	// Initialize provider registry with available providers

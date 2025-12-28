@@ -14,6 +14,7 @@ import (
 	"github.com/ingvar/aiaggregator/apps/worker/internal/handlers"
 	"github.com/ingvar/aiaggregator/packages/adapters"
 	"github.com/ingvar/aiaggregator/packages/providers"
+	"github.com/ingvar/aiaggregator/packages/pubsub"
 	"github.com/ingvar/aiaggregator/packages/shared"
 	"github.com/ingvar/aiaggregator/packages/usecases"
 )
@@ -24,8 +25,10 @@ const (
 )
 
 func main() {
-	// Load .env file if exists
-	_ = godotenv.Load()
+	// Load .env file if exists (try multiple locations)
+	_ = godotenv.Load()           // Current directory
+	_ = godotenv.Load("../../.env") // From apps/worker to root
+	_ = godotenv.Load("../../../.env") // From apps/worker/cmd/worker to root
 
 	log := shared.NewLogger("worker")
 	cfg := shared.LoadConfig()
@@ -104,8 +107,20 @@ func main() {
 	}
 	log.Info().Str("default_provider", defaultProvider).Msg("Default provider selected")
 
+	// Initialize Redis publisher for job updates
+	publisher, err := pubsub.NewPublisher(cfg.RedisURL)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to create Redis publisher, subscriptions will not work")
+	} else {
+		defer publisher.Close()
+		log.Info().Msg("Redis publisher initialized for job updates")
+	}
+
 	// Initialize process job service
 	processService := usecases.NewProcessJobService(jobRepo, usageRepo, registry.Get)
+	if publisher != nil {
+		processService.SetPublisher(publisher)
+	}
 
 	// Create job handler
 	jobHandler := handlers.NewJobHandler(processService, defaultProvider)

@@ -36,6 +36,13 @@ func AuthMiddleware(authService *usecases.AuthService) func(http.Handler) http.H
 				return
 			}
 
+			// Skip authentication for WebSocket upgrade requests
+			// Auth will be handled via connectionParams in the WebSocket InitFunc
+			if r.Header.Get("Upgrade") == "websocket" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			apiKey := extractAPIKey(r)
 			if apiKey == "" {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
