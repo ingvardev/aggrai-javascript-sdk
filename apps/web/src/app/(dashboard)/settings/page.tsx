@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslation } from 'react-i18next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GeneralSettings } from '@/components/settings/general-settings'
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings'
@@ -5,21 +8,23 @@ import { NotificationsSettings } from '@/components/settings/notifications-setti
 import { PricingSettings } from '@/components/settings/pricing-settings'
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
         <p className="text-muted-foreground">
-          Manage your account and application preferences
+          {t('settings.tenant.title')}
         </p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="pricing">Pricing</TabsTrigger>
+          <TabsTrigger value="general">{t('settings.tenant.title')}</TabsTrigger>
+          <TabsTrigger value="api-keys">{t('nav.apiKeys')}</TabsTrigger>
+          <TabsTrigger value="notifications">{t('settings.notifications.title')}</TabsTrigger>
+          <TabsTrigger value="pricing">{t('nav.pricing')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">

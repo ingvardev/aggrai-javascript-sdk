@@ -31,6 +31,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { usePricingList, useUpdatePricing, useCreatePricing, useDeletePricing } from '@/lib/hooks'
+import { ProviderPricing } from '@/lib/api'
 import { getProviderDisplayName } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Trash2, DollarSign } from 'lucide-react'
@@ -61,7 +62,7 @@ export function PricingSettings() {
     isDefault: false,
   })
 
-  const handleEdit = (pricing: typeof pricingList[0]) => {
+  const handleEdit = (pricing: ProviderPricing) => {
     setEditingPricing({
       id: pricing.id,
       provider: pricing.provider,

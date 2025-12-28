@@ -2,17 +2,18 @@ import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { QueryProvider } from '@/components/providers/query-provider'
+import { I18nProvider } from '@/components/providers/i18n-provider'
 import { CommandPalette } from '@/components/command-palette'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const inter = Inter({
-  subsets: ['latin'],
+  subsets: ['latin', 'cyrillic'],
   variable: '--font-sans',
 })
 
 const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
+  subsets: ['latin', 'cyrillic'],
   variable: '--font-mono',
 })
 
@@ -36,9 +37,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            {children}
-            <CommandPalette />
-            <Toaster richColors position="bottom-right" />
+            <I18nProvider>
+              {children}
+              <CommandPalette />
+              <Toaster richColors position="bottom-right" />
+            </I18nProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

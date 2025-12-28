@@ -1,0 +1,164 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "create": "Создать",
+    "search": "Поиск",
+    "actions": "Действия",
+    "status": "Статус",
+    "type": "Тип",
+    "provider": "Провайдер",
+    "model": "Модель",
+    "cost": "Стоимость",
+    "tokens": "Токены",
+    "input": "Вход",
+    "output": "Выход",
+    "result": "Результат",
+    "time": "Время",
+    "yes": "Да",
+    "no": "Нет",
+    "confirm": "Подтвердить",
+    "close": "Закрыть",
+    "refresh": "Обновить",
+    "autoSelect": "Автовыбор",
+    "default": "По умолчанию"
+  },
+  "nav": {
+    "dashboard": "Главная",
+    "jobs": "Задачи",
+    "chat": "Чат",
+    "usage": "Использование",
+    "settings": "Настройки",
+    "apiKeys": "API ключи",
+    "pricing": "Тарификация",
+    "providers": "Провайдеры"
+  },
+  "dashboard": {
+    "title": "Главная",
+    "welcome": "Добро пожаловать в AI Aggregator",
+    "totalJobs": "Всего задач",
+    "totalCost": "Общая стоимость",
+    "activeProviders": "Активные провайдеры",
+    "recentJobs": "Недавние задачи"
+  },
+  "jobs": {
+    "title": "Задачи",
+    "createJob": "Создать задачу",
+    "jobDetails": "Детали задачи",
+    "noJobs": "Задачи не найдены",
+    "status": {
+      "pending": "Ожидает",
+      "processing": "Обработка",
+      "completed": "Завершено",
+      "failed": "Ошибка"
+    },
+    "type": {
+      "text": "Текст",
+      "image": "Изображение"
+    },
+    "filters": {
+      "all": "Все",
+      "byStatus": "По статусу",
+      "byProvider": "По провайдеру"
+    }
+  },
+  "chat": {
+    "title": "Потоковый чат",
+    "placeholder": "Введите запрос...",
+    "send": "Отправить",
+    "stop": "Стоп",
+    "reset": "Сброс",
+    "selectProvider": "Выбрать провайдера",
+    "selectModel": "Выбрать модель",
+    "defaultModel": "Модель по умолчанию",
+    "streaming": "Генерация...",
+    "stats": {
+      "tokensIn": "Токенов на входе",
+      "tokensOut": "Токенов на выходе",
+      "cost": "Стоимость"
+    },
+    "hint": "Введите запрос и наблюдайте за потоковой генерацией ответа в реальном времени..."
+  },
+  "usage": {
+    "title": "Статистика использования",
+    "totalTokensIn": "Всего входных токенов",
+    "totalTokensOut": "Всего выходных токенов",
+    "totalCost": "Общая стоимость",
+    "jobCount": "Количество задач",
+    "byProvider": "Использование по провайдерам",
+    "noData": "Нет данных об использовании"
+  },
+  "settings": {
+    "title": "Настройки",
+    "tenant": {
+      "title": "Настройки организации",
+      "name": "Название организации",
+      "active": "Активна"
+    },
+    "notifications": {
+      "title": "Уведомления",
+      "jobCompleted": "Задача завершена",
+      "jobFailed": "Ошибка задачи",
+      "providerOffline": "Провайдер недоступен",
+      "usageThreshold": "Порог использования",
+      "weeklySummary": "Еженедельная сводка"
+    },
+    "language": {
+      "title": "Язык",
+      "select": "Выбрать язык",
+      "en": "English",
+      "ru": "Русский"
+    }
+  },
+  "apiKeys": {
+    "title": "API ключи",
+    "description": "Управление API ключами для аутентификации",
+    "key": "API ключ",
+    "name": "Название",
+    "createdAt": "Создан",
+    "lastUsed": "Последнее использование",
+    "create": "Создать API ключ",
+    "revoke": "Отозвать",
+    "copy": "Копировать",
+    "copied": "Скопировано!"
+  },
+  "pricing": {
+    "title": "Настройка тарификации",
+    "description": "Настройка цен за модель для расчёта стоимости",
+    "provider": "Провайдер",
+    "model": "Модель",
+    "inputPrice": "Цена входа (за 1М токенов)",
+    "outputPrice": "Цена выхода (за 1М токенов)",
+    "imagePrice": "Цена изображения",
+    "addPricing": "Добавить тариф",
+    "editPricing": "Редактировать тариф",
+    "noPricing": "Тарифы не настроены"
+  },
+  "providers": {
+    "title": "Провайдеры",
+    "status": "Статус",
+    "enabled": "Включён",
+    "disabled": "Отключён",
+    "available": "Доступен",
+    "unavailable": "Недоступен",
+    "priority": "Приоритет",
+    "types": {
+      "openai": "OpenAI",
+      "claude": "Claude (Anthropic)",
+      "ollama": "Ollama (Локальный)",
+      "local": "Локальный",
+      "stub": "Stub (Тестовый)"
+    }
+  },
+  "errors": {
+    "unauthorized": "Не авторизован. Проверьте API ключ.",
+    "notFound": "Ресурс не найден",
+    "serverError": "Ошибка сервера. Попробуйте позже.",
+    "networkError": "Ошибка сети. Проверьте подключение.",
+    "validationError": "Ошибка валидации. Проверьте введённые данные."
+  }
+}

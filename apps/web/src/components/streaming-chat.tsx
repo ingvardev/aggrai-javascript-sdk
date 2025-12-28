@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,6 +19,7 @@ import { formatCurrency, getProviderDisplayName } from '@/lib/utils'
 import { Loader2, Send, Square, RotateCcw, Sparkles } from 'lucide-react'
 
 export function StreamingChat() {
+  const { t } = useTranslation()
   const [prompt, setPrompt] = useState('')
   const [selectedProvider, setSelectedProvider] = useState<string>('')
   const [selectedModel, setSelectedModel] = useState<string>('')
@@ -81,7 +83,7 @@ export function StreamingChat() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5" />
-            Streaming Chat
+            {t('chat.title')}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Select
@@ -89,10 +91,10 @@ export function StreamingChat() {
               onValueChange={(value) => setSelectedProvider(value === 'auto' ? '' : value)}
             >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Auto-select provider" />
+                <SelectValue placeholder={t('common.autoSelect')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto-select</SelectItem>
+                <SelectItem value="auto">{t('common.autoSelect')}</SelectItem>
                 {textProviders?.map((provider) => (
                   <SelectItem key={provider.name} value={provider.name}>
                     {getProviderDisplayName(provider.name)}
@@ -107,10 +109,10 @@ export function StreamingChat() {
                 disabled={isLoadingModels}
               >
                 <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder={isLoadingModels ? 'Loading...' : 'Default model'} />
+                  <SelectValue placeholder={isLoadingModels ? t('common.loading') : t('chat.defaultModel')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Default model</SelectItem>
+                  <SelectItem value="default">{t('chat.defaultModel')}</SelectItem>
                   {models?.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       {model.name}
@@ -140,7 +142,7 @@ export function StreamingChat() {
             <div className="text-destructive">{error}</div>
           ) : (
             <div className="text-muted-foreground">
-              Enter a prompt below and watch the response stream in real-time...
+              {t('chat.hint')}
             </div>
           )}
         </div>
@@ -149,13 +151,13 @@ export function StreamingChat() {
         {stats && (
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <Badge variant="outline">
-              Tokens In: {stats.tokensIn.toLocaleString()}
+              {t('chat.stats.tokensIn')}: {stats.tokensIn.toLocaleString()}
             </Badge>
             <Badge variant="outline">
-              Tokens Out: {stats.tokensOut.toLocaleString()}
+              {t('chat.stats.tokensOut')}: {stats.tokensOut.toLocaleString()}
             </Badge>
             <Badge variant="outline">
-              Cost: {formatCurrency(stats.cost)}
+              {t('chat.stats.cost')}: {formatCurrency(stats.cost)}
             </Badge>
           </div>
         )}
@@ -166,7 +168,7 @@ export function StreamingChat() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Enter your prompt... (Enter to send, Shift+Enter for new line)"
+            placeholder={t('chat.placeholder')}
             className="min-h-[80px] flex-1 resize-none"
             disabled={isStreaming}
           />
@@ -177,6 +179,7 @@ export function StreamingChat() {
                 variant="destructive"
                 size="icon"
                 onClick={stopStream}
+                title={t('chat.stop')}
               >
                 <Square className="h-4 w-4" />
               </Button>
@@ -185,6 +188,7 @@ export function StreamingChat() {
                 type="submit"
                 size="icon"
                 disabled={!prompt.trim()}
+                title={t('chat.send')}
               >
                 <Send className="h-4 w-4" />
               </Button>
@@ -195,6 +199,7 @@ export function StreamingChat() {
               size="icon"
               onClick={handleReset}
               disabled={isStreaming && !content}
+              title={t('chat.reset')}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -204,7 +209,7 @@ export function StreamingChat() {
         {isStreaming && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Streaming response...
+            {t('chat.streaming')}
           </div>
         )}
       </CardContent>

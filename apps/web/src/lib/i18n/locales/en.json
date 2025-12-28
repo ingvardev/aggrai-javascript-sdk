@@ -1,0 +1,164 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "actions": "Actions",
+    "status": "Status",
+    "type": "Type",
+    "provider": "Provider",
+    "model": "Model",
+    "cost": "Cost",
+    "tokens": "Tokens",
+    "input": "Input",
+    "output": "Output",
+    "result": "Result",
+    "time": "Time",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "close": "Close",
+    "refresh": "Refresh",
+    "autoSelect": "Auto-select",
+    "default": "Default"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "jobs": "Jobs",
+    "chat": "Chat",
+    "usage": "Usage",
+    "settings": "Settings",
+    "apiKeys": "API Keys",
+    "pricing": "Pricing",
+    "providers": "Providers"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to AI Aggregator",
+    "totalJobs": "Total Jobs",
+    "totalCost": "Total Cost",
+    "activeProviders": "Active Providers",
+    "recentJobs": "Recent Jobs"
+  },
+  "jobs": {
+    "title": "Jobs",
+    "createJob": "Create Job",
+    "jobDetails": "Job Details",
+    "noJobs": "No jobs found",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "type": {
+      "text": "Text",
+      "image": "Image"
+    },
+    "filters": {
+      "all": "All",
+      "byStatus": "By Status",
+      "byProvider": "By Provider"
+    }
+  },
+  "chat": {
+    "title": "Streaming Chat",
+    "placeholder": "Enter your prompt...",
+    "send": "Send",
+    "stop": "Stop",
+    "reset": "Reset",
+    "selectProvider": "Select Provider",
+    "selectModel": "Select Model",
+    "defaultModel": "Default model",
+    "streaming": "Streaming...",
+    "stats": {
+      "tokensIn": "Tokens In",
+      "tokensOut": "Tokens Out",
+      "cost": "Cost"
+    },
+    "hint": "Enter a prompt below and watch the response stream in real-time..."
+  },
+  "usage": {
+    "title": "Usage Statistics",
+    "totalTokensIn": "Total Input Tokens",
+    "totalTokensOut": "Total Output Tokens",
+    "totalCost": "Total Cost",
+    "jobCount": "Job Count",
+    "byProvider": "Usage by Provider",
+    "noData": "No usage data available"
+  },
+  "settings": {
+    "title": "Settings",
+    "tenant": {
+      "title": "Tenant Settings",
+      "name": "Organization Name",
+      "active": "Active"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "jobCompleted": "Job Completed",
+      "jobFailed": "Job Failed",
+      "providerOffline": "Provider Offline",
+      "usageThreshold": "Usage Threshold",
+      "weeklySummary": "Weekly Summary"
+    },
+    "language": {
+      "title": "Language",
+      "select": "Select Language",
+      "en": "English",
+      "ru": "Русский"
+    }
+  },
+  "apiKeys": {
+    "title": "API Keys",
+    "description": "Manage your API keys for authentication",
+    "key": "API Key",
+    "name": "Name",
+    "createdAt": "Created At",
+    "lastUsed": "Last Used",
+    "create": "Create API Key",
+    "revoke": "Revoke",
+    "copy": "Copy",
+    "copied": "Copied!"
+  },
+  "pricing": {
+    "title": "Pricing Configuration",
+    "description": "Configure pricing per model for cost calculation",
+    "provider": "Provider",
+    "model": "Model",
+    "inputPrice": "Input Price (per 1M tokens)",
+    "outputPrice": "Output Price (per 1M tokens)",
+    "imagePrice": "Image Price",
+    "addPricing": "Add Pricing",
+    "editPricing": "Edit Pricing",
+    "noPricing": "No pricing configurations found"
+  },
+  "providers": {
+    "title": "Providers",
+    "status": "Status",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "priority": "Priority",
+    "types": {
+      "openai": "OpenAI",
+      "claude": "Claude (Anthropic)",
+      "ollama": "Ollama (Local)",
+      "local": "Local",
+      "stub": "Stub (Test)"
+    }
+  },
+  "errors": {
+    "unauthorized": "Unauthorized. Please check your API key.",
+    "notFound": "Resource not found",
+    "serverError": "Server error. Please try again later.",
+    "networkError": "Network error. Check your connection.",
+    "validationError": "Validation error. Please check your input."
+  }
+}
