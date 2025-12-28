@@ -210,7 +210,67 @@ OLLAMA_URL=http://localhost:11434
 API_PORT=8080
 ENABLE_PLAYGROUND=true
 ENABLE_STUB_PROVIDER=false  # Enable stub provider for testing
+
+# Security (API Users)
+API_KEY_HMAC_SECRET=your-secret-key-here  # REQUIRED in production
 ```
+
+## API Users & API Keys
+
+Multi-user support per tenant with granular permissions:
+
+### Scopes
+| Scope | Description |
+|-------|-------------|
+| `read` | Read-only access (list jobs, view usage) |
+| `write` | Create and modify resources |
+| `admin` | Full access including user management |
+| `*` | All permissions |
+
+### Admin REST API
+
+All endpoints require `X-API-Key` header with `admin` scope.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/admin/users` | Create API user |
+| GET | `/api/admin/users` | List API users |
+| POST | `/api/admin/users/{id}/keys` | Create API key for user |
+| GET | `/api/admin/users/{id}/keys` | List user's API keys |
+| DELETE | `/api/admin/keys/{id}` | Revoke API key |
+
+### Create User
+```bash
+curl -X POST http://localhost:8080/api/admin/users \
+  -H "X-API-Key: admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Developer", "email": "dev@example.com", "role": "user"}'
+```
+
+### Create API Key
+```bash
+curl -X POST http://localhost:8080/api/admin/users/{user_id}/keys \
+  -H "X-API-Key: admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Production Key", "scopes": ["read", "write"]}'
+```
+
+Response includes the raw key (shown only once):
+```json
+{
+  "id": "uuid",
+  "key": "agg_xxxxxxxxxxxx",
+  "name": "Production Key",
+  "scopes": ["read", "write"]
+}
+```
+
+### Security Features
+- **HMAC-SHA256 hashing** — keys stored securely with server secret
+- **Rate limiting** — 100 auth attempts per minute per IP
+- **Audit logging** — all key operations and auth failures logged
+- **Tenant isolation** — ownership checks on key revocation
+- **Backward compatibility** — legacy `tenants.api_key` still works
 
 ## Common Tasks
 

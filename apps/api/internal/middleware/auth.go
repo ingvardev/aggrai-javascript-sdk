@@ -3,9 +3,11 @@ package middleware
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/ingvar/aiaggregator/packages/domain"
 	"github.com/ingvar/aiaggregator/packages/usecases"
 )
@@ -15,6 +17,12 @@ type contextKey string
 const (
 	// TenantContextKey is the context key for the authenticated tenant.
 	TenantContextKey contextKey = "tenant"
+	// AuthContextKey is the context key for the full auth context.
+	AuthContextKey contextKey = "auth_context"
+	// TenantIDContextKey is the context key for the tenant ID.
+	TenantIDContextKey contextKey = "tenant_id"
+	// APIUserIDContextKey is the context key for the API user ID.
+	APIUserIDContextKey contextKey = "api_user_id"
 )
 
 // TenantFromContext retrieves the tenant from the request context.
@@ -26,12 +34,37 @@ func TenantFromContext(ctx context.Context) *domain.Tenant {
 	return tenant
 }
 
+// AuthContextFromContext retrieves the auth context from the request context.
+func AuthContextFromContext(ctx context.Context) *domain.AuthContext {
+	authCtx, ok := ctx.Value(AuthContextKey).(*domain.AuthContext)
+	if !ok {
+		return nil
+	}
+	return authCtx
+}
+
+// TenantIDFromContext retrieves the tenant ID from the request context.
+func TenantIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(TenantIDContextKey).(uuid.UUID)
+	return id, ok
+}
+
+// APIUserIDFromContext retrieves the API user ID from the request context (may be nil).
+func APIUserIDFromContext(ctx context.Context) *uuid.UUID {
+	id, ok := ctx.Value(APIUserIDContextKey).(uuid.UUID)
+	if !ok {
+		return nil
+	}
+	return &id
+}
+
 // AuthMiddleware creates authentication middleware.
 func AuthMiddleware(authService *usecases.AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip authentication for certain paths
-			if r.URL.Path == "/health" || r.URL.Path == "/playground" || r.URL.Path == "/" {
+			if r.URL.Path == "/health" || r.URL.Path == "/healthz" || r.URL.Path == "/readyz" ||
+				r.URL.Path == "/playground" || r.URL.Path == "/" {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -45,23 +78,65 @@ func AuthMiddleware(authService *usecases.AuthService) func(http.Handler) http.H
 
 			apiKey := extractAPIKey(r)
 			if apiKey == "" {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				http.Error(w, "Unauthorized: missing API key", http.StatusUnauthorized)
 				return
 			}
 
-			result, err := authService.Authenticate(r.Context(), apiKey)
+			// Build auth request with client context
+			authReq := &usecases.AuthenticateRequest{
+				RawKey:    apiKey,
+				ClientIP:  extractClientIP(r),
+				UserAgent: r.UserAgent(),
+			}
+
+			result, err := authService.AuthenticateWithContext(r.Context(), authReq)
 			if err != nil {
+				if err == usecases.ErrRateLimited {
+					http.Error(w, "Too many requests", http.StatusTooManyRequests)
+					return
+				}
 				http.Error(w, "Authentication error", http.StatusInternalServerError)
 				return
 			}
 
 			if !result.Authorized {
+				http.Error(w, "Unauthorized: invalid API key", http.StatusUnauthorized)
+				return
+			}
+
+			// Add tenant to context (backward compatibility)
+			ctx := context.WithValue(r.Context(), TenantContextKey, result.Tenant)
+
+			// Add auth context with tenant ID, API user ID, and scopes
+			if result.AuthCtx != nil {
+				ctx = context.WithValue(ctx, AuthContextKey, result.AuthCtx)
+				ctx = context.WithValue(ctx, TenantIDContextKey, result.AuthCtx.TenantID)
+				if result.AuthCtx.APIUserID != nil {
+					ctx = context.WithValue(ctx, APIUserIDContextKey, *result.AuthCtx.APIUserID)
+				}
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// RequireScope creates middleware that checks for required scope.
+func RequireScope(scope domain.APIKeyScope) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authCtx := AuthContextFromContext(r.Context())
+			if authCtx == nil {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), TenantContextKey, result.Tenant)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			if !authCtx.HasScope(scope) {
+				http.Error(w, "Forbidden: insufficient scope", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }
@@ -85,4 +160,32 @@ func extractAPIKey(r *http.Request) string {
 	}
 
 	return ""
+}
+
+// extractClientIP extracts the client IP from the request.
+func extractClientIP(r *http.Request) net.IP {
+	// Check X-Forwarded-For header (for proxied requests)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			ip := strings.TrimSpace(ips[0])
+			if parsed := net.ParseIP(ip); parsed != nil {
+				return parsed
+			}
+		}
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		if parsed := net.ParseIP(xri); parsed != nil {
+			return parsed
+		}
+	}
+
+	// Fall back to RemoteAddr
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return nil
+	}
+	return net.ParseIP(host)
 }

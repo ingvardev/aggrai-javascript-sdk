@@ -21,6 +21,7 @@ import (
 	"github.com/ingvar/aiaggregator/apps/api/internal/handlers"
 	appMiddleware "github.com/ingvar/aiaggregator/apps/api/internal/middleware"
 	"github.com/ingvar/aiaggregator/packages/adapters"
+	"github.com/ingvar/aiaggregator/packages/domain"
 	"github.com/ingvar/aiaggregator/packages/providers"
 	"github.com/ingvar/aiaggregator/packages/pubsub"
 	"github.com/ingvar/aiaggregator/packages/queue"
@@ -43,6 +44,9 @@ func main() {
 	var jobRepo usecases.JobRepository
 	var tenantRepo usecases.TenantRepository
 	var usageRepo usecases.UsageRepository
+	var apiUserRepo usecases.APIUserRepository
+	var apiKeyRepo usecases.APIKeyRepository
+	var auditLogRepo usecases.AuditLogRepository
 	var testAPIKey string
 
 	// Try to connect to PostgreSQL
@@ -56,6 +60,10 @@ func main() {
 		jobRepo = memJobRepo
 		tenantRepo = memTenantRepo
 		usageRepo = memUsageRepo
+		// API user repos are nil in in-memory mode (legacy auth only)
+		apiUserRepo = nil
+		apiKeyRepo = nil
+		auditLogRepo = nil
 		// Seed test tenant for development
 		testTenant := memTenantRepo.SeedTestTenant()
 		testAPIKey = testTenant.APIKey
@@ -70,6 +78,9 @@ func main() {
 		jobRepo = adapters.NewPostgresJobRepository(pool)
 		tenantRepo = adapters.NewPostgresTenantRepository(pool)
 		usageRepo = adapters.NewPostgresUsageRepository(pool)
+		apiUserRepo = adapters.NewPostgresAPIUserRepository(pool)
+		apiKeyRepo = adapters.NewPostgresAPIKeyRepository(pool)
+		auditLogRepo = adapters.NewPostgresAuditLogRepository(pool)
 		testAPIKey = "see database"
 		log.Info().Msg("Using PostgreSQL repositories")
 	}
@@ -183,7 +194,15 @@ func main() {
 	}
 
 	// Initialize services
-	authService := usecases.NewAuthService(tenantRepo)
+	// Set HMAC secret for API key hashing (use env var in production)
+	hmacSecret := os.Getenv("API_KEY_HMAC_SECRET")
+	if hmacSecret == "" {
+		hmacSecret = "dev-hmac-secret-change-in-production"
+		log.Warn().Msg("Using default HMAC secret - set API_KEY_HMAC_SECRET in production")
+	}
+	domain.SetHMACSecret(hmacSecret)
+
+	authService := usecases.NewAuthService(tenantRepo, apiKeyRepo, apiUserRepo, auditLogRepo)
 	jobService := usecases.NewJobService(jobRepo, jobQueue)
 
 	// Process job service for background processing
@@ -228,11 +247,26 @@ func main() {
 	// Streaming handler
 	streamHandler := handlers.NewStreamHandler(providerRegistry, authService)
 
+	// Admin handler for API users/keys management
+	adminHandler := handlers.NewAdminHandler(authService)
+
 	// Apply auth middleware for GraphQL and streaming
 	r.Group(func(r chi.Router) {
 		r.Use(appMiddleware.AuthMiddleware(authService))
 		r.Handle("/graphql", graphServer)
 		r.Handle("/stream", streamHandler)
+
+		// Admin API routes (require admin scope)
+		r.Route("/api/admin", func(r chi.Router) {
+			// API Users
+			r.Post("/users", adminHandler.CreateUser)
+			r.Get("/users", adminHandler.ListUsers)
+
+			// API Keys
+			r.Post("/api-keys", adminHandler.CreateKey)
+			r.Delete("/api-keys/{id}", adminHandler.RevokeKey)
+			r.Get("/users/{user_id}/api-keys", adminHandler.ListKeys)
+		})
 	})
 
 	// Create server

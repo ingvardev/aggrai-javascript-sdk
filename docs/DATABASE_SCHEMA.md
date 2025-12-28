@@ -8,8 +8,20 @@ PostgreSQL 16+
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                                                             │
 │  ┌──────────────┐         ┌──────────────┐         ┌──────────────┐        │
-│  │   tenants    │────────<│     jobs     │────────<│    usage     │        │
-│  └──────────────┘  1:N    └──────────────┘  1:1    └──────────────┘        │
+│  │   tenants    │────────<│  api_users   │────────<│   api_keys   │        │
+│  │              │   1:N   │              │   1:N   │              │        │
+│  │  api_key     │         │  tenant_id   │         │  api_user_id │        │
+│  │  (legacy)    │         │  name        │         │  key_hash    │        │
+│  └──────────────┘         └──────────────┘         └──────────────┘        │
+│         │                        │                                          │
+│         │                        │                                          │
+│         ▼                        ▼                                          │
+│  ┌──────────────┐         ┌──────────────┐         ┌──────────────────────┐│
+│  │     jobs     │         │    usage     │         │    api_audit_log     ││
+│  │              │         │              │         │                      ││
+│  │  tenant_id   │         │  tenant_id   │         │  tenant_id           ││
+│  │  api_user_id │         │  api_user_id │         │  api_user_id         ││
+│  └──────────────┘         └──────────────┘         └──────────────────────┘│
 │                                                                             │
 │  ┌──────────────┐         ┌──────────────────────┐                         │
 │  │  providers   │         │   provider_pricing   │                         │
@@ -194,6 +206,133 @@ CREATE TABLE usage (
 
 ---
 
+### api_users
+
+API-пользователи внутри tenant. Каждый пользователь может иметь несколько API-ключей.
+
+```sql
+CREATE TABLE api_users (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id  UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name       VARCHAR(255) NOT NULL,
+    email      VARCHAR(255),
+    role       VARCHAR(50) NOT NULL DEFAULT 'user',
+    active     BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| id | UUID | Первичный ключ |
+| tenant_id | UUID | FK → tenants.id |
+| name | VARCHAR(255) | Имя пользователя |
+| email | VARCHAR(255) | Email (опционально) |
+| role | VARCHAR(50) | Роль: user, admin |
+| active | BOOLEAN | Активность пользователя |
+| created_at | TIMESTAMPTZ | Дата создания |
+| updated_at | TIMESTAMPTZ | Дата обновления |
+
+**Индексы:**
+- `idx_api_users_tenant_id` — выборка пользователей по tenant
+- `idx_api_users_email` — поиск по email
+
+**Trigger:** `trigger_api_users_updated_at` — автообновление `updated_at`
+
+---
+
+### api_keys
+
+API-ключи пользователей. Хранятся в виде HMAC-SHA256 хеша.
+
+```sql
+CREATE TABLE api_keys (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    api_user_id  UUID NOT NULL REFERENCES api_users(id) ON DELETE CASCADE,
+    tenant_id    UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    key_hash     VARCHAR(64) NOT NULL UNIQUE,
+    key_prefix   VARCHAR(12) NOT NULL,
+    name         VARCHAR(255) NOT NULL DEFAULT 'Default Key',
+    scopes       TEXT[] NOT NULL DEFAULT ARRAY['read', 'write'],
+    expires_at   TIMESTAMPTZ,
+    last_used_at TIMESTAMPTZ,
+    usage_count  BIGINT NOT NULL DEFAULT 0,
+    revoked      BOOLEAN NOT NULL DEFAULT false,
+    revoked_at   TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| id | UUID | Первичный ключ |
+| api_user_id | UUID | FK → api_users.id |
+| tenant_id | UUID | FK → tenants.id (денормализовано для быстрого поиска) |
+| key_hash | VARCHAR(64) | HMAC-SHA256 хеш ключа |
+| key_prefix | VARCHAR(12) | Префикс ключа (agg_xxxx...) для идентификации |
+| name | VARCHAR(255) | Название ключа |
+| scopes | TEXT[] | Разрешения: read, write, admin, * |
+| expires_at | TIMESTAMPTZ | Дата истечения (NULL = бессрочный) |
+| last_used_at | TIMESTAMPTZ | Последнее использование |
+| usage_count | BIGINT | Счётчик использований |
+| revoked | BOOLEAN | Отозван ли ключ |
+| revoked_at | TIMESTAMPTZ | Дата отзыва |
+| created_at | TIMESTAMPTZ | Дата создания |
+
+**Индексы:**
+- `idx_api_keys_key_hash` — быстрый поиск по хешу ключа
+- `idx_api_keys_api_user_id` — ключи пользователя
+- `idx_api_keys_tenant_id` — ключи tenant
+- `idx_api_keys_prefix` — поиск по префиксу
+
+---
+
+### api_audit_log
+
+Лог аудита операций с API-ключами и аутентификации.
+
+```sql
+CREATE TABLE api_audit_log (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id   UUID REFERENCES tenants(id) ON DELETE SET NULL,
+    api_user_id UUID REFERENCES api_users(id) ON DELETE SET NULL,
+    api_key_id  UUID REFERENCES api_keys(id) ON DELETE SET NULL,
+    action      VARCHAR(50) NOT NULL,
+    ip_address  INET,
+    user_agent  TEXT,
+    details     JSONB,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| id | UUID | Первичный ключ |
+| tenant_id | UUID | FK → tenants.id |
+| api_user_id | UUID | FK → api_users.id |
+| api_key_id | UUID | FK → api_keys.id |
+| action | VARCHAR(50) | Тип действия |
+| ip_address | INET | IP-адрес клиента |
+| user_agent | TEXT | User-Agent заголовок |
+| details | JSONB | Дополнительные данные |
+| created_at | TIMESTAMPTZ | Время события |
+
+**Действия (action):**
+- `key_created` — создан новый ключ
+- `key_revoked` — ключ отозван
+- `auth_success` — успешная аутентификация
+- `auth_failure` — неудачная аутентификация
+- `scope_denied` — отказ доступа из-за недостающего scope
+
+**Индексы:**
+- `idx_api_audit_log_tenant_id` — аудит по tenant
+- `idx_api_audit_log_api_user_id` — аудит по пользователю
+- `idx_api_audit_log_created_at` — временные выборки
+- `idx_api_audit_log_action` — фильтрация по типу действия
+
+---
+
 ### provider_pricing
 
 Цены на токены и изображения по провайдерам и моделям.
@@ -263,9 +402,15 @@ INSERT INTO tenants (id, name, api_key, active) VALUES
 ## Связи
 
 ```
-tenants (1) ─────< (N) jobs (1) ─────< (1) usage
-    │
-    └── api_key используется для аутентификации
+tenants (1) ─────< (N) api_users (1) ─────< (N) api_keys
+    │                      │
+    │                      └────────────────────┐
+    ▼                                           ▼
+jobs (N) ─────────────────────────────────< usage (N)
+    │                                           │
+    └── api_user_id (nullable)                  └── api_user_id (nullable)
+
+api_audit_log ── связана с tenants, api_users, api_keys
 
 provider_pricing ── не связана с другими таблицами (справочник)
 providers ── не связана (legacy, конфигурация в коде)
@@ -284,6 +429,7 @@ providers ── не связана (legacy, конфигурация в код
 | 5 | 000005_seed_data | Тестовые данные |
 | 6 | 000006_add_tenant_settings | Колонки default_provider, settings |
 | 7 | 000007_create_provider_pricing | Таблица provider_pricing с ценами |
+| 8 | 000008_create_api_users | Таблицы api_users, api_keys, api_audit_log |
 
 **Запуск миграций:**
 ```bash
