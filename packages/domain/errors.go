@@ -5,6 +5,7 @@ import "errors"
 
 // Domain errors.
 var (
+	ErrNotFound            = errors.New("not found")
 	ErrJobNotFound         = errors.New("job not found")
 	ErrTenantNotFound      = errors.New("tenant not found")
 	ErrProviderNotFound    = errors.New("provider not found")
