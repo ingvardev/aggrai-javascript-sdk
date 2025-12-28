@@ -24,8 +24,9 @@ type Config struct {
 	OllamaURL       string
 
 	// Features
-	EnablePlayground bool
-	LogLevel         string
+	EnablePlayground    bool
+	EnableStubProvider  bool
+	LogLevel            string
 }
 
 // LoadConfig loads configuration from environment variables.
@@ -47,8 +48,9 @@ func LoadConfig() *Config {
 		OllamaURL:       getEnv("OLLAMA_URL", "http://localhost:11434"),
 
 		// Features
-		EnablePlayground: getEnvBool("ENABLE_PLAYGROUND", true),
-		LogLevel:         getEnv("LOG_LEVEL", "debug"),
+		EnablePlayground:   getEnvBool("ENABLE_PLAYGROUND", true),
+		EnableStubProvider: getEnvBool("ENABLE_STUB_PROVIDER", false),
+		LogLevel:           getEnv("LOG_LEVEL", "debug"),
 	}
 }
 

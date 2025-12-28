@@ -73,9 +73,11 @@ func main() {
 	// Initialize provider registry with available providers
 	registry := providers.NewProviderRegistry()
 
-	// Always register stub provider for testing
-	registry.Register(providers.NewStubProvider("stub-provider"))
-	log.Info().Msg("Stub provider registered")
+	// Register stub provider only in dev mode
+	if cfg.EnableStubProvider {
+		registry.Register(providers.NewStubProvider("stub-provider"))
+		log.Info().Msg("Stub provider registered (dev mode)")
+	}
 
 	// Register OpenAI if configured
 	if cfg.OpenAIAPIKey != "" {
