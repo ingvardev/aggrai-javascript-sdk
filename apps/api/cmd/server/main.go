@@ -108,6 +108,17 @@ func main() {
 		log.Info().Msg("Claude provider registered")
 	}
 
+	// Register Ollama if available (check at startup)
+	ollamaProvider := providers.NewOllamaProvider(providers.OllamaConfig{
+		Endpoint: cfg.OllamaURL,
+	})
+	if ollamaProvider.IsAvailable(context.Background()) {
+		providerRegistry.Register(ollamaProvider)
+		log.Info().Str("endpoint", cfg.OllamaURL).Msg("Ollama provider registered")
+	} else {
+		log.Debug().Str("endpoint", cfg.OllamaURL).Msg("Ollama not available, skipping")
+	}
+
 	// Initialize services
 	authService := usecases.NewAuthService(tenantRepo)
 	jobService := usecases.NewJobService(jobRepo, jobQueue)

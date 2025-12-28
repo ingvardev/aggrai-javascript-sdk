@@ -84,12 +84,23 @@ func main() {
 		log.Info().Msg("Claude provider registered")
 	}
 
+	// Register Ollama if available
+	ollamaProvider := providers.NewOllamaProvider(providers.OllamaConfig{
+		Endpoint: cfg.OllamaURL,
+	})
+	if ollamaProvider.IsAvailable(context.Background()) {
+		registry.Register(ollamaProvider)
+		log.Info().Str("endpoint", cfg.OllamaURL).Msg("Ollama provider registered")
+	}
+
 	// Determine default provider
 	defaultProvider := "stub-provider"
 	if cfg.OpenAIAPIKey != "" {
 		defaultProvider = "openai"
 	} else if cfg.AnthropicAPIKey != "" {
 		defaultProvider = "claude"
+	} else if ollamaProvider.IsAvailable(context.Background()) {
+		defaultProvider = "ollama"
 	}
 	log.Info().Str("default_provider", defaultProvider).Msg("Default provider selected")
 
