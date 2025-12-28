@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"github.com/ingvar/aiaggregator/apps/api/internal/graph"
@@ -36,18 +37,40 @@ func main() {
 		Str("port", cfg.APIPort).
 		Msg("Starting AI Aggregator API server")
 
-	// Initialize in-memory repositories (for development)
-	// TODO: Switch to Postgres adapters in production
-	jobRepo := adapters.NewInMemoryJobRepository()
-	tenantRepo := adapters.NewInMemoryTenantRepository()
-	usageRepo := adapters.NewInMemoryUsageRepository()
+	// Initialize repositories based on configuration
+	var jobRepo usecases.JobRepository
+	var tenantRepo usecases.TenantRepository
+	var usageRepo usecases.UsageRepository
+	var testAPIKey string
 
-	// Seed test tenant for development
-	testTenant := tenantRepo.SeedTestTenant()
-	log.Info().
-		Str("tenant_id", testTenant.ID.String()).
-		Str("api_key", testTenant.APIKey).
-		Msg("Test tenant created")
+	// Try to connect to PostgreSQL
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		log.Warn().Err(err).Msg("PostgreSQL not available, using in-memory repositories")
+		// Fallback to in-memory for development
+		memJobRepo := adapters.NewInMemoryJobRepository()
+		memTenantRepo := adapters.NewInMemoryTenantRepository()
+		memUsageRepo := adapters.NewInMemoryUsageRepository()
+		jobRepo = memJobRepo
+		tenantRepo = memTenantRepo
+		usageRepo = memUsageRepo
+		// Seed test tenant for development
+		testTenant := memTenantRepo.SeedTestTenant()
+		testAPIKey = testTenant.APIKey
+		log.Info().
+			Str("tenant_id", testTenant.ID.String()).
+			Str("api_key", testTenant.APIKey).
+			Msg("Test tenant created (in-memory)")
+	} else {
+		defer pool.Close()
+		log.Info().Msg("Connected to PostgreSQL")
+		// Use PostgreSQL repositories
+		jobRepo = adapters.NewPostgresJobRepository(pool)
+		tenantRepo = adapters.NewPostgresTenantRepository(pool)
+		usageRepo = adapters.NewPostgresUsageRepository(pool)
+		testAPIKey = "see database"
+		log.Info().Msg("Using PostgreSQL repositories")
+	}
 
 	// Initialize job queue (optional - gracefully handle Redis unavailability)
 	var jobQueue usecases.JobQueue
@@ -60,10 +83,30 @@ func main() {
 		log.Info().Msg("Connected to Redis")
 	}
 
-	// Initialize provider registry
+	// Initialize provider registry with available providers
 	providerRegistry := providers.NewProviderRegistry()
+
+	// Always register stub provider for testing
 	providerRegistry.Register(providers.NewStubProvider("stub-provider"))
 	log.Info().Msg("Stub provider registered")
+
+	// Register OpenAI if configured
+	if cfg.OpenAIAPIKey != "" {
+		openai := providers.NewOpenAIProvider(providers.OpenAIConfig{
+			APIKey: cfg.OpenAIAPIKey,
+		})
+		providerRegistry.Register(openai)
+		log.Info().Msg("OpenAI provider registered")
+	}
+
+	// Register Claude if configured
+	if cfg.AnthropicAPIKey != "" {
+		claude := providers.NewClaudeProvider(providers.ClaudeConfig{
+			APIKey: cfg.AnthropicAPIKey,
+		})
+		providerRegistry.Register(claude)
+		log.Info().Msg("Claude provider registered")
+	}
 
 	// Initialize services
 	authService := usecases.NewAuthService(tenantRepo)
@@ -133,7 +176,7 @@ func main() {
 	log.Info().
 		Str("addr", srv.Addr).
 		Str("playground", fmt.Sprintf("http://localhost:%s/playground", cfg.APIPort)).
-		Str("test_api_key", testTenant.APIKey).
+		Str("test_api_key", testAPIKey).
 		Msg("Server is running")
 
 	<-done

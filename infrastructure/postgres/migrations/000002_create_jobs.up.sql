@@ -1,6 +1,3 @@
--- +migrate Up
--- SQL for migration up
-
 -- Jobs table
 CREATE TABLE IF NOT EXISTS jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,10 +17,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     finished_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_jobs_tenant_id ON jobs(tenant_id);
-CREATE INDEX idx_jobs_status ON jobs(status);
-CREATE INDEX idx_jobs_created_at ON jobs(created_at DESC);
-CREATE INDEX idx_jobs_tenant_status ON jobs(tenant_id, status);
-
--- +migrate Down
-DROP TABLE IF EXISTS jobs;
+CREATE INDEX IF NOT EXISTS idx_jobs_tenant_id ON jobs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs(tenant_id, status);

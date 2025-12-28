@@ -1,6 +1,3 @@
--- +migrate Up
--- SQL for migration up
-
 -- Providers table
 CREATE TABLE IF NOT EXISTS providers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,9 +13,6 @@ CREATE TABLE IF NOT EXISTS providers (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_providers_type ON providers(type);
-CREATE INDEX idx_providers_enabled ON providers(enabled);
-CREATE INDEX idx_providers_priority ON providers(priority);
-
--- +migrate Down
-DROP TABLE IF EXISTS providers;
+CREATE INDEX IF NOT EXISTS idx_providers_type ON providers(type);
+CREATE INDEX IF NOT EXISTS idx_providers_enabled ON providers(enabled);
+CREATE INDEX IF NOT EXISTS idx_providers_priority ON providers(priority);

@@ -1,6 +1,3 @@
--- +migrate Up
--- SQL for migration up
-
 -- Tenants table
 CREATE TABLE IF NOT EXISTS tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -11,8 +8,5 @@ CREATE TABLE IF NOT EXISTS tenants (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_tenants_api_key ON tenants(api_key);
-CREATE INDEX idx_tenants_active ON tenants(active);
-
--- +migrate Down
-DROP TABLE IF EXISTS tenants;
+CREATE INDEX IF NOT EXISTS idx_tenants_api_key ON tenants(api_key);
+CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(active);

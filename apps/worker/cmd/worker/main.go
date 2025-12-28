@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"github.com/ingvar/aiaggregator/apps/worker/internal/handlers"
@@ -39,20 +40,64 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to parse Redis URL")
 	}
 
-	// Initialize in-memory repositories (for development)
-	jobRepo := adapters.NewInMemoryJobRepository()
-	usageRepo := adapters.NewInMemoryUsageRepository()
+	// Initialize repositories based on configuration
+	var jobRepo usecases.JobRepository
+	var usageRepo usecases.UsageRepository
 
-	// Initialize provider registry
+	// Try to connect to PostgreSQL
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		log.Warn().Err(err).Msg("PostgreSQL not available, using in-memory repositories")
+		// Fallback to in-memory (warning: data won't be shared with API!)
+		jobRepo = adapters.NewInMemoryJobRepository()
+		usageRepo = adapters.NewInMemoryUsageRepository()
+	} else {
+		defer pool.Close()
+		log.Info().Msg("Connected to PostgreSQL")
+		// Use PostgreSQL repositories (shared with API)
+		jobRepo = adapters.NewPostgresJobRepository(pool)
+		usageRepo = adapters.NewPostgresUsageRepository(pool)
+	}
+
+	// Initialize provider registry with available providers
 	registry := providers.NewProviderRegistry()
+
+	// Always register stub provider for testing
 	registry.Register(providers.NewStubProvider("stub-provider"))
 	log.Info().Msg("Stub provider registered")
+
+	// Register OpenAI if configured
+	if cfg.OpenAIAPIKey != "" {
+		openai := providers.NewOpenAIProvider(providers.OpenAIConfig{
+			APIKey: cfg.OpenAIAPIKey,
+		})
+		registry.Register(openai)
+		log.Info().Msg("OpenAI provider registered")
+	}
+
+	// Register Claude if configured
+	if cfg.AnthropicAPIKey != "" {
+		claude := providers.NewClaudeProvider(providers.ClaudeConfig{
+			APIKey: cfg.AnthropicAPIKey,
+		})
+		registry.Register(claude)
+		log.Info().Msg("Claude provider registered")
+	}
+
+	// Determine default provider
+	defaultProvider := "stub-provider"
+	if cfg.OpenAIAPIKey != "" {
+		defaultProvider = "openai"
+	} else if cfg.AnthropicAPIKey != "" {
+		defaultProvider = "claude"
+	}
+	log.Info().Str("default_provider", defaultProvider).Msg("Default provider selected")
 
 	// Initialize process job service
 	processService := usecases.NewProcessJobService(jobRepo, usageRepo, registry.Get)
 
 	// Create job handler
-	jobHandler := handlers.NewJobHandler(processService, "stub-provider")
+	jobHandler := handlers.NewJobHandler(processService, defaultProvider)
 
 	// Create asynq server
 	srv := asynq.NewServer(
