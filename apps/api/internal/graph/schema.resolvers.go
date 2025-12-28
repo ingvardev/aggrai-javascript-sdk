@@ -16,6 +16,46 @@ import (
 	"github.com/ingvar/aiaggregator/packages/usecases"
 )
 
+// Login is the resolver for the login field.
+func (r *mutationResolver) Login(ctx context.Context, input LoginInput) (*AuthPayload, error) {
+	return r.loginImpl(ctx, input)
+}
+
+// Logout is the resolver for the logout field.
+func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
+	return r.logoutImpl(ctx)
+}
+
+// LogoutAll is the resolver for the logoutAll field.
+func (r *mutationResolver) LogoutAll(ctx context.Context) (bool, error) {
+	return r.logoutAllImpl(ctx)
+}
+
+// Register is the resolver for the register field.
+func (r *mutationResolver) Register(ctx context.Context, input RegisterInput) (*AuthPayload, error) {
+	return r.registerImpl(ctx, input)
+}
+
+// ChangePassword is the resolver for the changePassword field.
+func (r *mutationResolver) ChangePassword(ctx context.Context, input ChangePasswordInput) (bool, error) {
+	return r.changePasswordImpl(ctx, input)
+}
+
+// CreateOwner is the resolver for the createOwner field.
+func (r *mutationResolver) CreateOwner(ctx context.Context, input CreateOwnerInput) (*TenantOwner, error) {
+	return r.createOwnerImpl(ctx, input)
+}
+
+// UpdateOwner is the resolver for the updateOwner field.
+func (r *mutationResolver) UpdateOwner(ctx context.Context, id string, input UpdateOwnerInput) (*TenantOwner, error) {
+	return r.updateOwnerImpl(ctx, id, input)
+}
+
+// DeleteOwner is the resolver for the deleteOwner field.
+func (r *mutationResolver) DeleteOwner(ctx context.Context, id string) (bool, error) {
+	return r.deleteOwnerImpl(ctx, id)
+}
+
 // CreateJob is the resolver for the createJob field.
 func (r *mutationResolver) CreateJob(ctx context.Context, input CreateJobInput) (*Job, error) {
 	tenant := middleware.TenantFromContext(ctx)
@@ -210,6 +250,21 @@ func (r *mutationResolver) DeletePricing(ctx context.Context, id string) (bool, 
 	}
 
 	return true, nil
+}
+
+// CurrentOwner is the resolver for the currentOwner field.
+func (r *queryResolver) CurrentOwner(ctx context.Context) (*TenantOwner, error) {
+	return r.currentOwnerImpl(ctx)
+}
+
+// MySessions is the resolver for the mySessions field.
+func (r *queryResolver) MySessions(ctx context.Context) ([]*Session, error) {
+	return r.mySessionsImpl(ctx)
+}
+
+// TenantOwners is the resolver for the tenantOwners field.
+func (r *queryResolver) TenantOwners(ctx context.Context) ([]*TenantOwner, error) {
+	return r.tenantOwnersImpl(ctx)
 }
 
 // Me is the resolver for the me field.

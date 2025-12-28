@@ -10,9 +10,29 @@ import (
 	"time"
 )
 
+type AuthPayload struct {
+	Success      bool         `json:"success"`
+	SessionToken *string      `json:"sessionToken,omitempty"`
+	Owner        *TenantOwner `json:"owner,omitempty"`
+	Tenant       *Tenant      `json:"tenant,omitempty"`
+	Error        *string      `json:"error,omitempty"`
+}
+
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 type CreateJobInput struct {
 	Type  JobType `json:"type"`
 	Input string  `json:"input"`
+}
+
+type CreateOwnerInput struct {
+	Email    string    `json:"email"`
+	Password string    `json:"password"`
+	Name     string    `json:"name"`
+	Role     OwnerRole `json:"role"`
 }
 
 type CreatePricingInput struct {
@@ -55,6 +75,11 @@ type JobEdge struct {
 type JobsFilter struct {
 	Status *JobStatus `json:"status,omitempty"`
 	Type   *JobType   `json:"type,omitempty"`
+}
+
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type ModelInfo struct {
@@ -119,6 +144,21 @@ type ProviderPricing struct {
 type Query struct {
 }
 
+type RegisterInput struct {
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	Name       string `json:"name"`
+	TenantName string `json:"tenantName"`
+}
+
+type Session struct {
+	ID        string    `json:"id"`
+	UserAgent *string   `json:"userAgent,omitempty"`
+	IPAddress *string   `json:"ipAddress,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type Subscription struct {
 }
 
@@ -132,6 +172,19 @@ type Tenant struct {
 	UpdatedAt       time.Time       `json:"updatedAt"`
 }
 
+type TenantOwner struct {
+	ID            string     `json:"id"`
+	TenantID      string     `json:"tenantId"`
+	Email         string     `json:"email"`
+	Name          string     `json:"name"`
+	Role          OwnerRole  `json:"role"`
+	Active        bool       `json:"active"`
+	EmailVerified bool       `json:"emailVerified"`
+	LastLoginAt   *time.Time `json:"lastLoginAt,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
 type TenantSettings struct {
 	DarkMode      bool                  `json:"darkMode"`
 	Notifications *NotificationSettings `json:"notifications"`
@@ -140,6 +193,12 @@ type TenantSettings struct {
 type TenantSettingsInput struct {
 	DarkMode      *bool                      `json:"darkMode,omitempty"`
 	Notifications *NotificationSettingsInput `json:"notifications,omitempty"`
+}
+
+type UpdateOwnerInput struct {
+	Name   *string    `json:"name,omitempty"`
+	Role   *OwnerRole `json:"role,omitempty"`
+	Active *bool      `json:"active,omitempty"`
 }
 
 type UpdatePricingInput struct {
@@ -285,6 +344,63 @@ func (e *JobType) UnmarshalJSON(b []byte) error {
 }
 
 func (e JobType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type OwnerRole string
+
+const (
+	OwnerRoleOwner  OwnerRole = "OWNER"
+	OwnerRoleAdmin  OwnerRole = "ADMIN"
+	OwnerRoleMember OwnerRole = "MEMBER"
+)
+
+var AllOwnerRole = []OwnerRole{
+	OwnerRoleOwner,
+	OwnerRoleAdmin,
+	OwnerRoleMember,
+}
+
+func (e OwnerRole) IsValid() bool {
+	switch e {
+	case OwnerRoleOwner, OwnerRoleAdmin, OwnerRoleMember:
+		return true
+	}
+	return false
+}
+
+func (e OwnerRole) String() string {
+	return string(e)
+}
+
+func (e *OwnerRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = OwnerRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid OwnerRole", str)
+	}
+	return nil
+}
+
+func (e OwnerRole) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *OwnerRole) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e OwnerRole) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

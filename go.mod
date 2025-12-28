@@ -14,6 +14,7 @@ require (
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/rs/zerolog v1.32.0
 	github.com/vektah/gqlparser/v2 v2.5.31
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 )
 
 require (

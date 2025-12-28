@@ -47,6 +47,8 @@ func main() {
 	var apiUserRepo usecases.APIUserRepository
 	var apiKeyRepo usecases.APIKeyRepository
 	var auditLogRepo usecases.AuditLogRepository
+	var ownerRepo usecases.TenantOwnerRepository
+	var sessionRepo usecases.OwnerSessionRepository
 	var testAPIKey string
 
 	// Try to connect to PostgreSQL
@@ -64,6 +66,8 @@ func main() {
 		apiUserRepo = nil
 		apiKeyRepo = nil
 		auditLogRepo = nil
+		ownerRepo = nil
+		sessionRepo = nil
 		// Seed test tenant for development
 		testTenant := memTenantRepo.SeedTestTenant()
 		testAPIKey = testTenant.APIKey
@@ -81,6 +85,8 @@ func main() {
 		apiUserRepo = adapters.NewPostgresAPIUserRepository(pool)
 		apiKeyRepo = adapters.NewPostgresAPIKeyRepository(pool)
 		auditLogRepo = adapters.NewPostgresAuditLogRepository(pool)
+		ownerRepo = adapters.NewPostgresTenantOwnerRepository(pool)
+		sessionRepo = adapters.NewPostgresOwnerSessionRepository(pool)
 		testAPIKey = "see database"
 		log.Info().Msg("Using PostgreSQL repositories")
 	}
@@ -205,6 +211,13 @@ func main() {
 	authService := usecases.NewAuthService(tenantRepo, apiKeyRepo, apiUserRepo, auditLogRepo)
 	jobService := usecases.NewJobService(jobRepo, jobQueue)
 
+	// Initialize web auth service for tenant owners (dashboard login)
+	var webAuthService *usecases.WebAuthService
+	if ownerRepo != nil && sessionRepo != nil {
+		webAuthService = usecases.NewWebAuthService(ownerRepo, sessionRepo, tenantRepo, auditLogRepo)
+		log.Info().Msg("Web auth service initialized")
+	}
+
 	// Process job service for background processing
 	_ = usecases.NewProcessJobService(jobRepo, usageRepo, providerRegistry.Get)
 
@@ -241,7 +254,7 @@ func main() {
 	}
 
 	// GraphQL endpoint with auth middleware
-	graphResolver := graph.NewResolver(jobService, authService, tenantRepo, usageRepo, pricingService, providerRegistry)
+	graphResolver := graph.NewResolver(jobService, authService, webAuthService, tenantRepo, usageRepo, pricingService, providerRegistry)
 	graphServer := graph.NewServer(graphResolver)
 
 	// Streaming handler
@@ -250,8 +263,12 @@ func main() {
 	// Admin handler for API users/keys management
 	adminHandler := handlers.NewAdminHandler(authService)
 
+	// Web auth middleware for session-based auth
+	webAuthMiddleware := appMiddleware.NewWebAuthMiddleware(webAuthService)
+
 	// Apply auth middleware for GraphQL and streaming
 	r.Group(func(r chi.Router) {
+		r.Use(webAuthMiddleware.Handler) // Web session auth (optional)
 		r.Use(appMiddleware.AuthMiddleware(authService))
 		r.Handle("/graphql", graphServer)
 		r.Handle("/stream", streamHandler)

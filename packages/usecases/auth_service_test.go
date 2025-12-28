@@ -18,7 +18,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 		tenant := domain.NewTenant("Test Tenant", "test-api-key-123")
 		_ = repo.Create(ctx, tenant)
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		result, err := svc.Authenticate(ctx, "test-api-key-123")
 
 		if err != nil {
@@ -37,7 +37,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("invalid API key", func(t *testing.T) {
 		repo := NewMockTenantRepository()
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		result, err := svc.Authenticate(ctx, "invalid-key")
 
 		if err != nil {
@@ -52,7 +52,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	t.Run("empty API key", func(t *testing.T) {
 		repo := NewMockTenantRepository()
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		result, err := svc.Authenticate(ctx, "")
 
 		if err != nil {
@@ -71,7 +71,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 		tenant.Deactivate()
 		_ = repo.Create(ctx, tenant)
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		result, err := svc.Authenticate(ctx, "test-api-key")
 
 		if err != nil {
@@ -83,15 +83,19 @@ func TestAuthService_Authenticate(t *testing.T) {
 		}
 	})
 
-	t.Run("repository error", func(t *testing.T) {
+	t.Run("repository error returns unauthorized (not error)", func(t *testing.T) {
 		repo := NewMockTenantRepository()
 		repo.GetByKeyErr = errors.New("db error")
 
-		svc := NewAuthService(repo)
-		_, err := svc.Authenticate(ctx, "some-key")
+		svc := NewAuthService(repo, nil, nil, nil)
+		result, err := svc.Authenticate(ctx, "some-key")
 
-		if err == nil {
-			t.Fatal("expected error, got nil")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if result.Authorized {
+			t.Error("expected authorized to be false on repository error")
 		}
 	})
 }
@@ -105,7 +109,7 @@ func TestAuthService_AuthenticateByAPIKey(t *testing.T) {
 		tenant := domain.NewTenant("Test Tenant", "test-api-key")
 		_ = repo.Create(ctx, tenant)
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		result, err := svc.AuthenticateByAPIKey(ctx, "test-api-key")
 
 		if err != nil {
@@ -120,7 +124,7 @@ func TestAuthService_AuthenticateByAPIKey(t *testing.T) {
 	t.Run("invalid API key returns error", func(t *testing.T) {
 		repo := NewMockTenantRepository()
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		_, err := svc.AuthenticateByAPIKey(ctx, "invalid-key")
 
 		if err == nil {
@@ -142,7 +146,7 @@ func TestAuthService_GetTenant(t *testing.T) {
 		tenant := domain.NewTenant("Test Tenant", "test-api-key")
 		_ = repo.Create(ctx, tenant)
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		result, err := svc.GetTenant(ctx, tenant.ID)
 
 		if err != nil {
@@ -157,7 +161,7 @@ func TestAuthService_GetTenant(t *testing.T) {
 	t.Run("non-existing tenant", func(t *testing.T) {
 		repo := NewMockTenantRepository()
 
-		svc := NewAuthService(repo)
+		svc := NewAuthService(repo, nil, nil, nil)
 		_, err := svc.GetTenant(ctx, uuid.New())
 
 		if err == nil {

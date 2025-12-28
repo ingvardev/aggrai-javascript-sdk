@@ -48,6 +48,14 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AuthPayload struct {
+		Error        func(childComplexity int) int
+		Owner        func(childComplexity int) int
+		SessionToken func(childComplexity int) int
+		Success      func(childComplexity int) int
+		Tenant       func(childComplexity int) int
+	}
+
 	Job struct {
 		Cost       func(childComplexity int) int
 		CreatedAt  func(childComplexity int) int
@@ -84,12 +92,20 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CancelJob     func(childComplexity int, id string) int
-		CreateJob     func(childComplexity int, input CreateJobInput) int
-		CreatePricing func(childComplexity int, input CreatePricingInput) int
-		DeletePricing func(childComplexity int, id string) int
-		UpdatePricing func(childComplexity int, input UpdatePricingInput) int
-		UpdateTenant  func(childComplexity int, input UpdateTenantInput) int
+		CancelJob      func(childComplexity int, id string) int
+		ChangePassword func(childComplexity int, input ChangePasswordInput) int
+		CreateJob      func(childComplexity int, input CreateJobInput) int
+		CreateOwner    func(childComplexity int, input CreateOwnerInput) int
+		CreatePricing  func(childComplexity int, input CreatePricingInput) int
+		DeleteOwner    func(childComplexity int, id string) int
+		DeletePricing  func(childComplexity int, id string) int
+		Login          func(childComplexity int, input LoginInput) int
+		Logout         func(childComplexity int) int
+		LogoutAll      func(childComplexity int) int
+		Register       func(childComplexity int, input RegisterInput) int
+		UpdateOwner    func(childComplexity int, id string, input UpdateOwnerInput) int
+		UpdatePricing  func(childComplexity int, input UpdatePricingInput) int
+		UpdateTenant   func(childComplexity int, input UpdateTenantInput) int
 	}
 
 	NotificationSettings struct {
@@ -128,14 +144,25 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		CurrentOwner      func(childComplexity int) int
 		Job               func(childComplexity int, id string) int
 		Jobs              func(childComplexity int, filter *JobsFilter, pagination *PaginationInput) int
 		Me                func(childComplexity int) int
+		MySessions        func(childComplexity int) int
 		PricingByProvider func(childComplexity int, provider string) int
 		PricingList       func(childComplexity int) int
 		ProviderModels    func(childComplexity int, provider string) int
 		Providers         func(childComplexity int) int
+		TenantOwners      func(childComplexity int) int
 		UsageSummary      func(childComplexity int) int
+	}
+
+	Session struct {
+		CreatedAt func(childComplexity int) int
+		ExpiresAt func(childComplexity int) int
+		ID        func(childComplexity int) int
+		IPAddress func(childComplexity int) int
+		UserAgent func(childComplexity int) int
 	}
 
 	Subscription struct {
@@ -152,6 +179,19 @@ type ComplexityRoot struct {
 		Name            func(childComplexity int) int
 		Settings        func(childComplexity int) int
 		UpdatedAt       func(childComplexity int) int
+	}
+
+	TenantOwner struct {
+		Active        func(childComplexity int) int
+		CreatedAt     func(childComplexity int) int
+		Email         func(childComplexity int) int
+		EmailVerified func(childComplexity int) int
+		ID            func(childComplexity int) int
+		LastLoginAt   func(childComplexity int) int
+		Name          func(childComplexity int) int
+		Role          func(childComplexity int) int
+		TenantID      func(childComplexity int) int
+		UpdatedAt     func(childComplexity int) int
 	}
 
 	TenantSettings struct {
@@ -181,6 +221,14 @@ type ComplexityRoot struct {
 }
 
 type MutationResolver interface {
+	Login(ctx context.Context, input LoginInput) (*AuthPayload, error)
+	Logout(ctx context.Context) (bool, error)
+	LogoutAll(ctx context.Context) (bool, error)
+	Register(ctx context.Context, input RegisterInput) (*AuthPayload, error)
+	ChangePassword(ctx context.Context, input ChangePasswordInput) (bool, error)
+	CreateOwner(ctx context.Context, input CreateOwnerInput) (*TenantOwner, error)
+	UpdateOwner(ctx context.Context, id string, input UpdateOwnerInput) (*TenantOwner, error)
+	DeleteOwner(ctx context.Context, id string) (bool, error)
 	CreateJob(ctx context.Context, input CreateJobInput) (*Job, error)
 	CancelJob(ctx context.Context, id string) (*Job, error)
 	UpdateTenant(ctx context.Context, input UpdateTenantInput) (*Tenant, error)
@@ -189,6 +237,9 @@ type MutationResolver interface {
 	DeletePricing(ctx context.Context, id string) (bool, error)
 }
 type QueryResolver interface {
+	CurrentOwner(ctx context.Context) (*TenantOwner, error)
+	MySessions(ctx context.Context) ([]*Session, error)
+	TenantOwners(ctx context.Context) ([]*TenantOwner, error)
 	Me(ctx context.Context) (*Tenant, error)
 	Job(ctx context.Context, id string) (*Job, error)
 	Jobs(ctx context.Context, filter *JobsFilter, pagination *PaginationInput) (*JobConnection, error)
@@ -222,6 +273,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AuthPayload.error":
+		if e.complexity.AuthPayload.Error == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.Error(childComplexity), true
+	case "AuthPayload.owner":
+		if e.complexity.AuthPayload.Owner == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.Owner(childComplexity), true
+	case "AuthPayload.sessionToken":
+		if e.complexity.AuthPayload.SessionToken == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.SessionToken(childComplexity), true
+	case "AuthPayload.success":
+		if e.complexity.AuthPayload.Success == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.Success(childComplexity), true
+	case "AuthPayload.tenant":
+		if e.complexity.AuthPayload.Tenant == nil {
+			break
+		}
+
+		return e.complexity.AuthPayload.Tenant(childComplexity), true
 
 	case "Job.cost":
 		if e.complexity.Job.Cost == nil {
@@ -376,6 +458,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CancelJob(childComplexity, args["id"].(string)), true
+	case "Mutation.changePassword":
+		if e.complexity.Mutation.ChangePassword == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_changePassword_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ChangePassword(childComplexity, args["input"].(ChangePasswordInput)), true
 	case "Mutation.createJob":
 		if e.complexity.Mutation.CreateJob == nil {
 			break
@@ -387,6 +480,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreateJob(childComplexity, args["input"].(CreateJobInput)), true
+	case "Mutation.createOwner":
+		if e.complexity.Mutation.CreateOwner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createOwner_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateOwner(childComplexity, args["input"].(CreateOwnerInput)), true
 	case "Mutation.createPricing":
 		if e.complexity.Mutation.CreatePricing == nil {
 			break
@@ -398,6 +502,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreatePricing(childComplexity, args["input"].(CreatePricingInput)), true
+	case "Mutation.deleteOwner":
+		if e.complexity.Mutation.DeleteOwner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteOwner_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteOwner(childComplexity, args["id"].(string)), true
 	case "Mutation.deletePricing":
 		if e.complexity.Mutation.DeletePricing == nil {
 			break
@@ -409,6 +524,51 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.DeletePricing(childComplexity, args["id"].(string)), true
+	case "Mutation.login":
+		if e.complexity.Mutation.Login == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_login_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.Login(childComplexity, args["input"].(LoginInput)), true
+	case "Mutation.logout":
+		if e.complexity.Mutation.Logout == nil {
+			break
+		}
+
+		return e.complexity.Mutation.Logout(childComplexity), true
+	case "Mutation.logoutAll":
+		if e.complexity.Mutation.LogoutAll == nil {
+			break
+		}
+
+		return e.complexity.Mutation.LogoutAll(childComplexity), true
+	case "Mutation.register":
+		if e.complexity.Mutation.Register == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_register_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.Register(childComplexity, args["input"].(RegisterInput)), true
+	case "Mutation.updateOwner":
+		if e.complexity.Mutation.UpdateOwner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateOwner_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateOwner(childComplexity, args["id"].(string), args["input"].(UpdateOwnerInput)), true
 	case "Mutation.updatePricing":
 		if e.complexity.Mutation.UpdatePricing == nil {
 			break
@@ -574,6 +734,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ProviderPricing.UpdatedAt(childComplexity), true
 
+	case "Query.currentOwner":
+		if e.complexity.Query.CurrentOwner == nil {
+			break
+		}
+
+		return e.complexity.Query.CurrentOwner(childComplexity), true
 	case "Query.job":
 		if e.complexity.Query.Job == nil {
 			break
@@ -602,6 +768,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Me(childComplexity), true
+	case "Query.mySessions":
+		if e.complexity.Query.MySessions == nil {
+			break
+		}
+
+		return e.complexity.Query.MySessions(childComplexity), true
 	case "Query.pricingByProvider":
 		if e.complexity.Query.PricingByProvider == nil {
 			break
@@ -636,12 +808,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Providers(childComplexity), true
+	case "Query.tenantOwners":
+		if e.complexity.Query.TenantOwners == nil {
+			break
+		}
+
+		return e.complexity.Query.TenantOwners(childComplexity), true
 	case "Query.usageSummary":
 		if e.complexity.Query.UsageSummary == nil {
 			break
 		}
 
 		return e.complexity.Query.UsageSummary(childComplexity), true
+
+	case "Session.createdAt":
+		if e.complexity.Session.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Session.CreatedAt(childComplexity), true
+	case "Session.expiresAt":
+		if e.complexity.Session.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.Session.ExpiresAt(childComplexity), true
+	case "Session.id":
+		if e.complexity.Session.ID == nil {
+			break
+		}
+
+		return e.complexity.Session.ID(childComplexity), true
+	case "Session.ipAddress":
+		if e.complexity.Session.IPAddress == nil {
+			break
+		}
+
+		return e.complexity.Session.IPAddress(childComplexity), true
+	case "Session.userAgent":
+		if e.complexity.Session.UserAgent == nil {
+			break
+		}
+
+		return e.complexity.Session.UserAgent(childComplexity), true
 
 	case "Subscription.jobStatusChanged":
 		if e.complexity.Subscription.JobStatusChanged == nil {
@@ -709,6 +918,67 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Tenant.UpdatedAt(childComplexity), true
+
+	case "TenantOwner.active":
+		if e.complexity.TenantOwner.Active == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.Active(childComplexity), true
+	case "TenantOwner.createdAt":
+		if e.complexity.TenantOwner.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.CreatedAt(childComplexity), true
+	case "TenantOwner.email":
+		if e.complexity.TenantOwner.Email == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.Email(childComplexity), true
+	case "TenantOwner.emailVerified":
+		if e.complexity.TenantOwner.EmailVerified == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.EmailVerified(childComplexity), true
+	case "TenantOwner.id":
+		if e.complexity.TenantOwner.ID == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.ID(childComplexity), true
+	case "TenantOwner.lastLoginAt":
+		if e.complexity.TenantOwner.LastLoginAt == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.LastLoginAt(childComplexity), true
+	case "TenantOwner.name":
+		if e.complexity.TenantOwner.Name == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.Name(childComplexity), true
+	case "TenantOwner.role":
+		if e.complexity.TenantOwner.Role == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.Role(childComplexity), true
+	case "TenantOwner.tenantId":
+		if e.complexity.TenantOwner.TenantID == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.TenantID(childComplexity), true
+	case "TenantOwner.updatedAt":
+		if e.complexity.TenantOwner.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.TenantOwner.UpdatedAt(childComplexity), true
 
 	case "TenantSettings.darkMode":
 		if e.complexity.TenantSettings.DarkMode == nil {
@@ -817,12 +1087,17 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputChangePasswordInput,
 		ec.unmarshalInputCreateJobInput,
+		ec.unmarshalInputCreateOwnerInput,
 		ec.unmarshalInputCreatePricingInput,
 		ec.unmarshalInputJobsFilter,
+		ec.unmarshalInputLoginInput,
 		ec.unmarshalInputNotificationSettingsInput,
 		ec.unmarshalInputPaginationInput,
+		ec.unmarshalInputRegisterInput,
 		ec.unmarshalInputTenantSettingsInput,
+		ec.unmarshalInputUpdateOwnerInput,
 		ec.unmarshalInputUpdatePricingInput,
 		ec.unmarshalInputUpdateTenantInput,
 	)
@@ -969,10 +1244,32 @@ func (ec *executionContext) field_Mutation_cancelJob_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_changePassword_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNChangePasswordInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐChangePasswordInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createJob_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNCreateJobInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreateJobInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createOwner_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNCreateOwnerInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreateOwnerInput)
 	if err != nil {
 		return nil, err
 	}
@@ -991,6 +1288,17 @@ func (ec *executionContext) field_Mutation_createPricing_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteOwner_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deletePricing_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -999,6 +1307,44 @@ func (ec *executionContext) field_Mutation_deletePricing_args(ctx context.Contex
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNLoginInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐLoginInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_register_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNRegisterInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐRegisterInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateOwner_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateOwnerInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdateOwnerInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -1146,6 +1492,189 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AuthPayload_success(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_success,
+		func(ctx context.Context) (any, error) {
+			return obj.Success, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_sessionToken(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_sessionToken,
+		func(ctx context.Context) (any, error) {
+			return obj.SessionToken, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_sessionToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_owner(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_owner,
+		func(ctx context.Context) (any, error) {
+			return obj.Owner, nil
+		},
+		nil,
+		ec.marshalOTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_owner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TenantOwner_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_TenantOwner_tenantId(ctx, field)
+			case "email":
+				return ec.fieldContext_TenantOwner_email(ctx, field)
+			case "name":
+				return ec.fieldContext_TenantOwner_name(ctx, field)
+			case "role":
+				return ec.fieldContext_TenantOwner_role(ctx, field)
+			case "active":
+				return ec.fieldContext_TenantOwner_active(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_TenantOwner_emailVerified(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_TenantOwner_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TenantOwner_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TenantOwner_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TenantOwner", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_tenant(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_tenant,
+		func(ctx context.Context) (any, error) {
+			return obj.Tenant, nil
+		},
+		nil,
+		ec.marshalOTenant2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenant,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_tenant(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Tenant_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Tenant_name(ctx, field)
+			case "active":
+				return ec.fieldContext_Tenant_active(ctx, field)
+			case "defaultProvider":
+				return ec.fieldContext_Tenant_defaultProvider(ctx, field)
+			case "settings":
+				return ec.fieldContext_Tenant_settings(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Tenant_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Tenant_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Tenant", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthPayload_error(ctx context.Context, field graphql.CollectedField, obj *AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthPayload_error,
+		func(ctx context.Context) (any, error) {
+			return obj.Error, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthPayload_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _Job_id(ctx context.Context, field graphql.CollectedField, obj *Job) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -1856,6 +2385,378 @@ func (ec *executionContext) fieldContext_ModelInfo_maxTokens(_ context.Context, 
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_login,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().Login(ctx, fc.Args["input"].(LoginInput))
+		},
+		nil,
+		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐAuthPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AuthPayload_success(ctx, field)
+			case "sessionToken":
+				return ec.fieldContext_AuthPayload_sessionToken(ctx, field)
+			case "owner":
+				return ec.fieldContext_AuthPayload_owner(ctx, field)
+			case "tenant":
+				return ec.fieldContext_AuthPayload_tenant(ctx, field)
+			case "error":
+				return ec.fieldContext_AuthPayload_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_login_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_logout,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().Logout(ctx)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_logout(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_logoutAll(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_logoutAll,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().LogoutAll(ctx)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_logoutAll(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_register(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_register,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().Register(ctx, fc.Args["input"].(RegisterInput))
+		},
+		nil,
+		ec.marshalNAuthPayload2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐAuthPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_register(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AuthPayload_success(ctx, field)
+			case "sessionToken":
+				return ec.fieldContext_AuthPayload_sessionToken(ctx, field)
+			case "owner":
+				return ec.fieldContext_AuthPayload_owner(ctx, field)
+			case "tenant":
+				return ec.fieldContext_AuthPayload_tenant(ctx, field)
+			case "error":
+				return ec.fieldContext_AuthPayload_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_register_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_changePassword(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_changePassword,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().ChangePassword(ctx, fc.Args["input"].(ChangePasswordInput))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_changePassword(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_changePassword_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createOwner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createOwner,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CreateOwner(ctx, fc.Args["input"].(CreateOwnerInput))
+		},
+		nil,
+		ec.marshalNTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createOwner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TenantOwner_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_TenantOwner_tenantId(ctx, field)
+			case "email":
+				return ec.fieldContext_TenantOwner_email(ctx, field)
+			case "name":
+				return ec.fieldContext_TenantOwner_name(ctx, field)
+			case "role":
+				return ec.fieldContext_TenantOwner_role(ctx, field)
+			case "active":
+				return ec.fieldContext_TenantOwner_active(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_TenantOwner_emailVerified(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_TenantOwner_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TenantOwner_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TenantOwner_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TenantOwner", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createOwner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateOwner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateOwner,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdateOwner(ctx, fc.Args["id"].(string), fc.Args["input"].(UpdateOwnerInput))
+		},
+		nil,
+		ec.marshalNTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateOwner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TenantOwner_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_TenantOwner_tenantId(ctx, field)
+			case "email":
+				return ec.fieldContext_TenantOwner_email(ctx, field)
+			case "name":
+				return ec.fieldContext_TenantOwner_name(ctx, field)
+			case "role":
+				return ec.fieldContext_TenantOwner_role(ctx, field)
+			case "active":
+				return ec.fieldContext_TenantOwner_active(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_TenantOwner_emailVerified(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_TenantOwner_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TenantOwner_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TenantOwner_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TenantOwner", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateOwner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteOwner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_deleteOwner,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().DeleteOwner(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteOwner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteOwner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -2893,6 +3794,149 @@ func (ec *executionContext) fieldContext_ProviderPricing_updatedAt(_ context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_currentOwner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_currentOwner,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().CurrentOwner(ctx)
+		},
+		nil,
+		ec.marshalOTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_currentOwner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TenantOwner_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_TenantOwner_tenantId(ctx, field)
+			case "email":
+				return ec.fieldContext_TenantOwner_email(ctx, field)
+			case "name":
+				return ec.fieldContext_TenantOwner_name(ctx, field)
+			case "role":
+				return ec.fieldContext_TenantOwner_role(ctx, field)
+			case "active":
+				return ec.fieldContext_TenantOwner_active(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_TenantOwner_emailVerified(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_TenantOwner_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TenantOwner_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TenantOwner_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TenantOwner", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_mySessions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_mySessions,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MySessions(ctx)
+		},
+		nil,
+		ec.marshalNSession2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐSessionᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_mySessions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Session_id(ctx, field)
+			case "userAgent":
+				return ec.fieldContext_Session_userAgent(ctx, field)
+			case "ipAddress":
+				return ec.fieldContext_Session_ipAddress(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_Session_expiresAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Session_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_tenantOwners(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_tenantOwners,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().TenantOwners(ctx)
+		},
+		nil,
+		ec.marshalNTenantOwner2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwnerᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_tenantOwners(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TenantOwner_id(ctx, field)
+			case "tenantId":
+				return ec.fieldContext_TenantOwner_tenantId(ctx, field)
+			case "email":
+				return ec.fieldContext_TenantOwner_email(ctx, field)
+			case "name":
+				return ec.fieldContext_TenantOwner_name(ctx, field)
+			case "role":
+				return ec.fieldContext_TenantOwner_role(ctx, field)
+			case "active":
+				return ec.fieldContext_TenantOwner_active(ctx, field)
+			case "emailVerified":
+				return ec.fieldContext_TenantOwner_emailVerified(ctx, field)
+			case "lastLoginAt":
+				return ec.fieldContext_TenantOwner_lastLoginAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TenantOwner_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TenantOwner_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TenantOwner", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3409,6 +4453,151 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Session_id(ctx context.Context, field graphql.CollectedField, obj *Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_userAgent(ctx context.Context, field graphql.CollectedField, obj *Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_userAgent,
+		func(ctx context.Context) (any, error) {
+			return obj.UserAgent, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_userAgent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_ipAddress(ctx context.Context, field graphql.CollectedField, obj *Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_ipAddress,
+		func(ctx context.Context) (any, error) {
+			return obj.IPAddress, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_ipAddress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_expiresAt(ctx context.Context, field graphql.CollectedField, obj *Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_expiresAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_createdAt(ctx context.Context, field graphql.CollectedField, obj *Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_jobUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -3783,6 +4972,296 @@ func (ec *executionContext) _Tenant_updatedAt(ctx context.Context, field graphql
 func (ec *executionContext) fieldContext_Tenant_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Tenant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_id(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_tenantId(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_tenantId,
+		func(ctx context.Context) (any, error) {
+			return obj.TenantID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_tenantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_email(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_email,
+		func(ctx context.Context) (any, error) {
+			return obj.Email, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_name(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_role(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_role,
+		func(ctx context.Context) (any, error) {
+			return obj.Role, nil
+		},
+		nil,
+		ec.marshalNOwnerRole2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type OwnerRole does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_active(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_active,
+		func(ctx context.Context) (any, error) {
+			return obj.Active, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_active(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_emailVerified(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_emailVerified,
+		func(ctx context.Context) (any, error) {
+			return obj.EmailVerified, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_emailVerified(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_lastLoginAt(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_lastLoginAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LastLoginAt, nil
+		},
+		nil,
+		ec.marshalOTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_lastLoginAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_createdAt(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TenantOwner_updatedAt(ctx context.Context, field graphql.CollectedField, obj *TenantOwner) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TenantOwner_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TenantOwner_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TenantOwner",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -5717,6 +7196,40 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputChangePasswordInput(ctx context.Context, obj any) (ChangePasswordInput, error) {
+	var it ChangePasswordInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"currentPassword", "newPassword"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "currentPassword":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("currentPassword"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CurrentPassword = data
+		case "newPassword":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newPassword"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewPassword = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateJobInput(ctx context.Context, obj any) (CreateJobInput, error) {
 	var it CreateJobInput
 	asMap := map[string]any{}
@@ -5745,6 +7258,54 @@ func (ec *executionContext) unmarshalInputCreateJobInput(ctx context.Context, ob
 				return it, err
 			}
 			it.Input = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputCreateOwnerInput(ctx context.Context, obj any) (CreateOwnerInput, error) {
+	var it CreateOwnerInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email", "password", "name", "role"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "role":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			data, err := ec.unmarshalNOwnerRole2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Role = data
 		}
 	}
 
@@ -5841,6 +7402,40 @@ func (ec *executionContext) unmarshalInputJobsFilter(ctx context.Context, obj an
 				return it, err
 			}
 			it.Type = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj any) (LoginInput, error) {
+	var it LoginInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email", "password"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
 		}
 	}
 
@@ -5950,6 +7545,54 @@ func (ec *executionContext) unmarshalInputPaginationInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputRegisterInput(ctx context.Context, obj any) (RegisterInput, error) {
+	var it RegisterInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email", "password", "name", "tenantName"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "tenantName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tenantName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TenantName = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputTenantSettingsInput(ctx context.Context, obj any) (TenantSettingsInput, error) {
 	var it TenantSettingsInput
 	asMap := map[string]any{}
@@ -5978,6 +7621,47 @@ func (ec *executionContext) unmarshalInputTenantSettingsInput(ctx context.Contex
 				return it, err
 			}
 			it.Notifications = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateOwnerInput(ctx context.Context, obj any) (UpdateOwnerInput, error) {
+	var it UpdateOwnerInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "role", "active"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "role":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			data, err := ec.unmarshalOOwnerRole2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Role = data
+		case "active":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("active"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Active = data
 		}
 	}
 
@@ -6087,6 +7771,53 @@ func (ec *executionContext) unmarshalInputUpdateTenantInput(ctx context.Context,
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var authPayloadImplementors = []string{"AuthPayload"}
+
+func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionSet, obj *AuthPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthPayload")
+		case "success":
+			out.Values[i] = ec._AuthPayload_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sessionToken":
+			out.Values[i] = ec._AuthPayload_sessionToken(ctx, field, obj)
+		case "owner":
+			out.Values[i] = ec._AuthPayload_owner(ctx, field, obj)
+		case "tenant":
+			out.Values[i] = ec._AuthPayload_tenant(ctx, field, obj)
+		case "error":
+			out.Values[i] = ec._AuthPayload_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
 
 var jobImplementors = []string{"Job"}
 
@@ -6337,6 +8068,62 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
+		case "login":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_login(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "logout":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logout(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "logoutAll":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logoutAll(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "register":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_register(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "changePassword":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_changePassword(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createOwner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createOwner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateOwner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateOwner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteOwner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteOwner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createJob":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createJob(ctx, field)
@@ -6666,6 +8453,69 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
+		case "currentOwner":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_currentOwner(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "mySessions":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_mySessions(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "tenantOwners":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_tenantOwners(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "me":
 			field := field
 
@@ -6867,6 +8717,59 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	return out
 }
 
+var sessionImplementors = []string{"Session"}
+
+func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, obj *Session) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, sessionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Session")
+		case "id":
+			out.Values[i] = ec._Session_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userAgent":
+			out.Values[i] = ec._Session_userAgent(ctx, field, obj)
+		case "ipAddress":
+			out.Values[i] = ec._Session_ipAddress(ctx, field, obj)
+		case "expiresAt":
+			out.Values[i] = ec._Session_expiresAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._Session_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var subscriptionImplementors = []string{"Subscription"}
 
 func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
@@ -6928,6 +8831,87 @@ func (ec *executionContext) _Tenant(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Tenant_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var tenantOwnerImplementors = []string{"TenantOwner"}
+
+func (ec *executionContext) _TenantOwner(ctx context.Context, sel ast.SelectionSet, obj *TenantOwner) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tenantOwnerImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TenantOwner")
+		case "id":
+			out.Values[i] = ec._TenantOwner_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tenantId":
+			out.Values[i] = ec._TenantOwner_tenantId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "email":
+			out.Values[i] = ec._TenantOwner_email(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._TenantOwner_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "role":
+			out.Values[i] = ec._TenantOwner_role(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "active":
+			out.Values[i] = ec._TenantOwner_active(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "emailVerified":
+			out.Values[i] = ec._TenantOwner_emailVerified(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastLoginAt":
+			out.Values[i] = ec._TenantOwner_lastLoginAt(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._TenantOwner_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._TenantOwner_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -7468,6 +9452,20 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNAuthPayload2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v AuthPayload) graphql.Marshaler {
+	return ec._AuthPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAuthPayload2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v *AuthPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AuthPayload(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -7484,8 +9482,18 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNChangePasswordInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐChangePasswordInput(ctx context.Context, v any) (ChangePasswordInput, error) {
+	res, err := ec.unmarshalInputChangePasswordInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateJobInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreateJobInput(ctx context.Context, v any) (CreateJobInput, error) {
 	res, err := ec.unmarshalInputCreateJobInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateOwnerInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐCreateOwnerInput(ctx context.Context, v any) (CreateOwnerInput, error) {
+	res, err := ec.unmarshalInputCreateOwnerInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -7644,6 +9652,11 @@ func (ec *executionContext) marshalNJobType2githubᚗcomᚋingvarᚋaiaggregator
 	return v
 }
 
+func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐLoginInput(ctx context.Context, v any) (LoginInput, error) {
+	res, err := ec.unmarshalInputLoginInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNModelInfo2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐModelInfoᚄ(ctx context.Context, sel ast.SelectionSet, v []*ModelInfo) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -7706,6 +9719,16 @@ func (ec *executionContext) marshalNNotificationSettings2ᚖgithubᚗcomᚋingva
 		return graphql.Null
 	}
 	return ec._NotificationSettings(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNOwnerRole2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole(ctx context.Context, v any) (OwnerRole, error) {
+	var res OwnerRole
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNOwnerRole2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole(ctx context.Context, sel ast.SelectionSet, v OwnerRole) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *PageInfo) graphql.Marshaler {
@@ -7840,6 +9863,65 @@ func (ec *executionContext) marshalNProviderType2githubᚗcomᚋingvarᚋaiaggre
 	return v
 }
 
+func (ec *executionContext) unmarshalNRegisterInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐRegisterInput(ctx context.Context, v any) (RegisterInput, error) {
+	res, err := ec.unmarshalInputRegisterInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSession2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐSessionᚄ(ctx context.Context, sel ast.SelectionSet, v []*Session) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNSession2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐSession(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNSession2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐSession(ctx context.Context, sel ast.SelectionSet, v *Session) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Session(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -7870,6 +9952,64 @@ func (ec *executionContext) marshalNTenant2ᚖgithubᚗcomᚋingvarᚋaiaggregat
 	return ec._Tenant(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNTenantOwner2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner(ctx context.Context, sel ast.SelectionSet, v TenantOwner) graphql.Marshaler {
+	return ec._TenantOwner(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTenantOwner2ᚕᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwnerᚄ(ctx context.Context, sel ast.SelectionSet, v []*TenantOwner) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner(ctx context.Context, sel ast.SelectionSet, v *TenantOwner) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TenantOwner(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {
 	res, err := graphql.UnmarshalTime(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -7884,6 +10024,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNUpdateOwnerInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdateOwnerInput(ctx context.Context, v any) (UpdateOwnerInput, error) {
+	res, err := ec.unmarshalInputUpdateOwnerInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdatePricingInput2githubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐUpdatePricingInput(ctx context.Context, v any) (UpdatePricingInput, error) {
@@ -8323,6 +10468,22 @@ func (ec *executionContext) unmarshalONotificationSettingsInput2ᚖgithubᚗcom�
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalOOwnerRole2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole(ctx context.Context, v any) (*OwnerRole, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(OwnerRole)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOOwnerRole2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐOwnerRole(ctx context.Context, sel ast.SelectionSet, v *OwnerRole) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
 func (ec *executionContext) unmarshalOPaginationInput2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐPaginationInput(ctx context.Context, v any) (*PaginationInput, error) {
 	if v == nil {
 		return nil, nil
@@ -8354,6 +10515,13 @@ func (ec *executionContext) marshalOTenant2ᚖgithubᚗcomᚋingvarᚋaiaggregat
 		return graphql.Null
 	}
 	return ec._Tenant(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOTenantOwner2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantOwner(ctx context.Context, sel ast.SelectionSet, v *TenantOwner) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TenantOwner(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOTenantSettings2ᚖgithubᚗcomᚋingvarᚋaiaggregatorᚋappsᚋapiᚋinternalᚋgraphᚐTenantSettings(ctx context.Context, sel ast.SelectionSet, v *TenantSettings) graphql.Marshaler {

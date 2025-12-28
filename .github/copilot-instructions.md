@@ -272,6 +272,118 @@ Response includes the raw key (shown only once):
 - **Tenant isolation** — ownership checks on key revocation
 - **Backward compatibility** — legacy `tenants.api_key` still works
 
+## Tenant Owners (Web Authentication)
+
+Human users who log into the dashboard. Uses GraphQL for all auth operations.
+
+### Owner Roles
+| Role | Description |
+|------|-------------|
+| `owner` | Full access, can manage all owners and settings |
+| `admin` | Can manage members and most settings |
+| `member` | Read-only access to dashboard |
+
+### Session-Based Auth
+- **bcrypt** for password hashing
+- **SHA256** for session token hashing
+- **24-hour** session duration
+- **Account lockout** after 5 failed attempts (15 min)
+
+### GraphQL Auth Operations
+
+**Login:**
+```graphql
+mutation {
+  login(input: {email: "user@example.com", password: "secret"}) {
+    success
+    sessionToken
+    owner { id email name role }
+    tenant { id name }
+    error
+  }
+}
+```
+
+**Register (creates tenant + owner):**
+```graphql
+mutation {
+  register(input: {
+    email: "user@example.com"
+    password: "secret"
+    name: "John Doe"
+    tenantName: "My Company"
+  }) {
+    success
+    sessionToken
+    owner { id email name }
+    tenant { id name }
+  }
+}
+```
+
+**Get Current Owner:**
+```graphql
+query {
+  currentOwner {
+    id
+    email
+    name
+    role
+    active
+    lastLoginAt
+  }
+}
+```
+
+**List Tenant Owners (admin only):**
+```graphql
+query {
+  tenantOwners {
+    id email name role active
+  }
+}
+```
+
+**Create Owner (admin only):**
+```graphql
+mutation {
+  createOwner(input: {
+    email: "new@example.com"
+    password: "secret"
+    name: "New User"
+    role: MEMBER
+  }) {
+    id email name role
+  }
+}
+```
+
+**Change Password:**
+```graphql
+mutation {
+  changePassword(input: {
+    currentPassword: "old"
+    newPassword: "new"
+  })
+}
+```
+
+**Logout:**
+```graphql
+mutation { logout }
+mutation { logoutAll }  # All sessions
+```
+
+### Session Token Usage
+Include session token in requests:
+```
+Authorization: Bearer <sessionToken>
+# or
+X-Session-Token: <sessionToken>
+# or
+Cookie: session_token=<sessionToken>
+```
+
 ## Common Tasks
 
 ### Add new AI provider

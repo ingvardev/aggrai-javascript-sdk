@@ -3,6 +3,7 @@ package usecases
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ingvar/aiaggregator/packages/domain"
@@ -88,3 +89,29 @@ type AuditLogRepository interface {
 	GetByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*domain.AuditLogEntry, error)
 	GetByAPIUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*domain.AuditLogEntry, error)
 }
+
+// TenantOwnerRepository defines the interface for tenant owner persistence.
+type TenantOwnerRepository interface {
+	Create(ctx context.Context, owner *domain.TenantOwner) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.TenantOwner, error)
+	GetByEmail(ctx context.Context, email string) (*domain.TenantOwner, error)
+	GetByTenantID(ctx context.Context, tenantID uuid.UUID) ([]*domain.TenantOwner, error)
+	Update(ctx context.Context, owner *domain.TenantOwner) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	// Security operations
+	IncrementFailedAttempts(ctx context.Context, id uuid.UUID) error
+	ResetFailedAttempts(ctx context.Context, id uuid.UUID) error
+	LockAccount(ctx context.Context, id uuid.UUID, until time.Time) error
+	UpdateLastLogin(ctx context.Context, id uuid.UUID, ip string) error
+}
+
+// OwnerSessionRepository defines the interface for session persistence.
+type OwnerSessionRepository interface {
+	Create(ctx context.Context, session *domain.OwnerSession) error
+	GetByTokenHash(ctx context.Context, tokenHash string) (*domain.OwnerSession, error)
+	GetByOwnerID(ctx context.Context, ownerID uuid.UUID) ([]*domain.OwnerSession, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteByOwnerID(ctx context.Context, ownerID uuid.UUID) error // Logout all
+	DeleteExpired(ctx context.Context) (int64, error)
+}
+

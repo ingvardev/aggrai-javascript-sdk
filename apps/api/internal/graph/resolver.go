@@ -20,6 +20,7 @@ import (
 type Resolver struct {
 	jobService       *usecases.JobService
 	authService      *usecases.AuthService
+	webAuthService   *usecases.WebAuthService
 	tenantRepo       usecases.TenantRepository
 	usageRepo        usecases.UsageRepository
 	pricingService   *usecases.PricingService
@@ -29,6 +30,7 @@ type Resolver struct {
 func NewResolver(
 	jobService *usecases.JobService,
 	authService *usecases.AuthService,
+	webAuthService *usecases.WebAuthService,
 	tenantRepo usecases.TenantRepository,
 	usageRepo usecases.UsageRepository,
 	pricingService *usecases.PricingService,
@@ -37,6 +39,7 @@ func NewResolver(
 	return &Resolver{
 		jobService:       jobService,
 		authService:      authService,
+		webAuthService:   webAuthService,
 		tenantRepo:       tenantRepo,
 		usageRepo:        usageRepo,
 		pricingService:   pricingService,

@@ -3,6 +3,52 @@
 scalar Time
 # scalar UUID - using ID instead
 
+# ============================================
+# Authentication Types
+# ============================================
+
+# TenantOwner represents a human user who can log in to the dashboard
+type TenantOwner {
+  id: ID!
+  tenantId: ID!
+  email: String!
+  name: String!
+  role: OwnerRole!
+  active: Boolean!
+  emailVerified: Boolean!
+  lastLoginAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+enum OwnerRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+# AuthPayload is returned after successful login
+type AuthPayload {
+  success: Boolean!
+  sessionToken: String
+  owner: TenantOwner
+  tenant: Tenant
+  error: String
+}
+
+# Session represents an active login session
+type Session {
+  id: ID!
+  userAgent: String
+  ipAddress: String
+  expiresAt: Time!
+  createdAt: Time!
+}
+
+# ============================================
+# Core Types
+# ============================================
+
 # Job represents an AI processing request
 type Job {
   id: ID!
@@ -129,7 +175,42 @@ type JobEdge {
   cursor: String!
 }
 
+# ============================================
 # Input types
+# ============================================
+
+# Authentication inputs
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  name: String!
+  tenantName: String!
+}
+
+input CreateOwnerInput {
+  email: String!
+  password: String!
+  name: String!
+  role: OwnerRole!
+}
+
+input UpdateOwnerInput {
+  name: String
+  role: OwnerRole
+  active: Boolean
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+# Job inputs
 input CreateJobInput {
   type: JobType!
   input: String!
@@ -192,6 +273,23 @@ type ModelInfo {
 
 # Queries
 type Query {
+  # ============================================
+  # Authentication Queries (public)
+  # ============================================
+
+  # Get current authenticated owner (requires session)
+  currentOwner: TenantOwner
+
+  # List all active sessions for current owner
+  mySessions: [Session!]!
+
+  # List all owners for the current tenant (requires admin role)
+  tenantOwners: [TenantOwner!]!
+
+  # ============================================
+  # Tenant Queries (requires API key auth)
+  # ============================================
+
   # Get current authenticated tenant
   me: Tenant
 
@@ -219,6 +317,42 @@ type Query {
 
 # Mutations
 type Mutation {
+  # ============================================
+  # Authentication Mutations (public)
+  # ============================================
+
+  # Login with email and password
+  login(input: LoginInput!): AuthPayload!
+
+  # Logout current session
+  logout: Boolean!
+
+  # Logout all sessions for current owner
+  logoutAll: Boolean!
+
+  # Register a new tenant and owner
+  register(input: RegisterInput!): AuthPayload!
+
+  # Change password for current owner
+  changePassword(input: ChangePasswordInput!): Boolean!
+
+  # ============================================
+  # Owner Management Mutations (requires admin role)
+  # ============================================
+
+  # Create a new owner in the current tenant
+  createOwner(input: CreateOwnerInput!): TenantOwner!
+
+  # Update an owner
+  updateOwner(id: ID!, input: UpdateOwnerInput!): TenantOwner!
+
+  # Delete an owner
+  deleteOwner(id: ID!): Boolean!
+
+  # ============================================
+  # Job Mutations (requires API key auth)
+  # ============================================
+
   # Create a new AI job
   createJob(input: CreateJobInput!): Job!
 
