@@ -51,8 +51,8 @@ func (p *OpenAIProvider) Name() string {
 }
 
 // Type returns the provider type.
-func (p *OpenAIProvider) Type() domain.ProviderType {
-	return domain.ProviderTypeOpenAI
+func (p *OpenAIProvider) Type() string {
+	return string(domain.ProviderTypeOpenAI)
 }
 
 // openAIChatRequest represents OpenAI chat completion request.
@@ -194,3 +194,47 @@ func (p *OpenAIProvider) GenerateImage(ctx context.Context, request *usecases.Im
 func (p *OpenAIProvider) IsAvailable(ctx context.Context) bool {
 	return p.apiKey != ""
 }
+
+// Execute processes a job and returns the result.
+// This is the main interface method for AIProvider.
+func (p *OpenAIProvider) Execute(ctx context.Context, job *domain.Job) (*usecases.ProviderResult, error) {
+	switch job.Type {
+	case domain.JobTypeText:
+		resp, err := p.Complete(ctx, &usecases.CompletionRequest{
+			JobID:     job.ID,
+			Prompt:    job.Input,
+			MaxTokens: 2048,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &usecases.ProviderResult{
+			Result:    resp.Content,
+			TokensIn:  resp.TokensIn,
+			TokensOut: resp.TokensOut,
+			Cost:      resp.Cost,
+			Model:     resp.Model,
+		}, nil
+
+	case domain.JobTypeImage:
+		resp, err := p.GenerateImage(ctx, &usecases.ImageRequest{
+			JobID:  job.ID,
+			Prompt: job.Input,
+			Size:   "1024x1024",
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &usecases.ProviderResult{
+			Result: resp.URL,
+			Cost:   resp.Cost,
+			Model:  resp.Model,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported job type: %s", job.Type)
+	}
+}
+
+// Ensure OpenAIProvider implements AIProvider
+var _ usecases.AIProvider = (*OpenAIProvider)(nil)

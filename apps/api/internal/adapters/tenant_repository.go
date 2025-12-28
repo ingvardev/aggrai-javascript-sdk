@@ -1,129 +1,137 @@
-package adapters
 // Package adapters contains infrastructure adapter implementations.
 package adapters
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/ingvar/aiaggregator/packages/domain"
+	"github.com/ingvar/aiaggregator/packages/usecases"
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	return tenants, nil	}		tenants = append(tenants, tenant)		}			return nil, err		if err != nil {		)			&tenant.CreatedAt, &tenant.UpdatedAt,			&tenant.ID, &tenant.Name, &tenant.APIKey, &tenant.Active,		err := rows.Scan(		tenant := &domain.Tenant{}	for rows.Next() {	var tenants []*domain.Tenant	defer rows.Close()	}		return nil, err	if err != nil {	rows, err := r.pool.Query(ctx, query, limit, offset)	`		LIMIT $1 OFFSET $2		ORDER BY created_at DESC		FROM tenants		SELECT id, name, api_key, active, created_at, updated_at	query := `func (r *PostgresTenantRepository) List(ctx context.Context, limit, offset int) ([]*domain.Tenant, error) {// List retrieves tenants with pagination.}	return err	_, err := r.pool.Exec(ctx, query, id)	query := `DELETE FROM tenants WHERE id = $1`func (r *PostgresTenantRepository) Delete(ctx context.Context, id uuid.UUID) error {// Delete removes a tenant from the database.}	return err	)		tenant.ID, tenant.Name, tenant.Active, tenant.UpdatedAt,	_, err := r.pool.Exec(ctx, query,	`		WHERE id = $1		UPDATE tenants SET name = $2, active = $3, updated_at = $4	query := `func (r *PostgresTenantRepository) Update(ctx context.Context, tenant *domain.Tenant) error {// Update updates an existing tenant in the database.}	return tenant, nil	}		return nil, err	if err != nil {	}		return nil, domain.ErrTenantNotFound	if err == pgx.ErrNoRows {	)		&tenant.CreatedAt, &tenant.UpdatedAt,		&tenant.ID, &tenant.Name, &tenant.APIKey, &tenant.Active,	err := row.Scan(	tenant := &domain.Tenant{}	row := r.pool.QueryRow(ctx, query, apiKey)	`		FROM tenants WHERE api_key = $1 AND active = true		SELECT id, name, api_key, active, created_at, updated_at	query := `func (r *PostgresTenantRepository) GetByAPIKey(ctx context.Context, apiKey string) (*domain.Tenant, error) {// GetByAPIKey retrieves a tenant by its API key.}	return tenant, nil	}		return nil, err	if err != nil {	}		return nil, domain.ErrTenantNotFound	if err == pgx.ErrNoRows {	)		&tenant.CreatedAt, &tenant.UpdatedAt,		&tenant.ID, &tenant.Name, &tenant.APIKey, &tenant.Active,	err := row.Scan(	tenant := &domain.Tenant{}	row := r.pool.QueryRow(ctx, query, id)	`		FROM tenants WHERE id = $1		SELECT id, name, api_key, active, created_at, updated_at	query := `func (r *PostgresTenantRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Tenant, error) {// GetByID retrieves a tenant by its ID.}	return err	)		tenant.CreatedAt, tenant.UpdatedAt,		tenant.ID, tenant.Name, tenant.APIKey, tenant.Active,	_, err := r.pool.Exec(ctx, query,	`		VALUES ($1, $2, $3, $4, $5, $6)		INSERT INTO tenants (id, name, api_key, active, created_at, updated_at)	query := `func (r *PostgresTenantRepository) Create(ctx context.Context, tenant *domain.Tenant) error {// Create inserts a new tenant into the database.}	return &PostgresTenantRepository{pool: pool}func NewPostgresTenantRepository(pool *pgxpool.Pool) *PostgresTenantRepository {// NewPostgresTenantRepository creates a new PostgreSQL tenant repository.}	pool *pgxpool.Pooltype PostgresTenantRepository struct {// PostgresTenantRepository implements TenantRepository using PostgreSQL.
+// InMemoryTenantRepository is an in-memory implementation of TenantRepository.
+type InMemoryTenantRepository struct {
+	mu      sync.RWMutex
+	tenants map[uuid.UUID]*domain.Tenant
+	byKey   map[string]*domain.Tenant
+}
+
+// Ensure InMemoryTenantRepository implements TenantRepository
+var _ usecases.TenantRepository = (*InMemoryTenantRepository)(nil)
+
+// NewInMemoryTenantRepository creates a new in-memory tenant repository.
+func NewInMemoryTenantRepository() *InMemoryTenantRepository {
+	return &InMemoryTenantRepository{
+		tenants: make(map[uuid.UUID]*domain.Tenant),
+		byKey:   make(map[string]*domain.Tenant),
+	}
+}
+
+// Create saves a new tenant.
+func (r *InMemoryTenantRepository) Create(ctx context.Context, tenant *domain.Tenant) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if tenant.ID == uuid.Nil {
+		tenant.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	if tenant.CreatedAt.IsZero() {
+		tenant.CreatedAt = now
+	}
+	tenant.UpdatedAt = now
+
+	r.tenants[tenant.ID] = tenant
+	r.byKey[tenant.APIKey] = tenant
+	return nil
+}
+
+// GetByID retrieves a tenant by ID.
+func (r *InMemoryTenantRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Tenant, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tenant, ok := r.tenants[id]
+	if !ok {
+		return nil, domain.ErrTenantNotFound
+	}
+	return tenant, nil
+}
+
+// GetByAPIKey retrieves a tenant by API key.
+func (r *InMemoryTenantRepository) GetByAPIKey(ctx context.Context, apiKey string) (*domain.Tenant, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tenant, ok := r.byKey[apiKey]
+	if !ok {
+		return nil, domain.ErrTenantNotFound
+	}
+	return tenant, nil
+}
+
+// Update updates a tenant.
+func (r *InMemoryTenantRepository) Update(ctx context.Context, tenant *domain.Tenant) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	old, ok := r.tenants[tenant.ID]
+	if !ok {
+		return domain.ErrTenantNotFound
+	}
+
+	// Remove old API key mapping
+	delete(r.byKey, old.APIKey)
+
+	tenant.UpdatedAt = time.Now().UTC()
+	r.tenants[tenant.ID] = tenant
+	r.byKey[tenant.APIKey] = tenant
+	return nil
+}
+
+// Delete removes a tenant.
+func (r *InMemoryTenantRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	tenant, ok := r.tenants[id]
+	if !ok {
+		return domain.ErrTenantNotFound
+	}
+
+	delete(r.byKey, tenant.APIKey)
+	delete(r.tenants, id)
+	return nil
+}
+
+// List returns all tenants with pagination.
+func (r *InMemoryTenantRepository) List(ctx context.Context, limit, offset int) ([]*domain.Tenant, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make([]*domain.Tenant, 0, len(r.tenants))
+	for _, t := range r.tenants {
+		result = append(result, t)
+	}
+
+	// Apply pagination
+	if offset >= len(result) {
+		return []*domain.Tenant{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
+}
+
+// SeedTestTenant creates a test tenant for development.
+func (r *InMemoryTenantRepository) SeedTestTenant() *domain.Tenant {
+	tenant := domain.NewTenant("Test Tenant", "test-api-key-12345")
+	_ = r.Create(context.Background(), tenant)
+	return tenant
+}

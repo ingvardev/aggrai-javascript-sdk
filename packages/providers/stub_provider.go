@@ -1,90 +1,100 @@
+// Package providers contains AI provider implementations.
 package providers
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	p.delay = delayfunc (p *StubProvider) SetDelay(delay time.Duration) {// SetDelay sets the simulated processing delay.}	p.available = availablefunc (p *StubProvider) SetAvailable(available bool) {// SetAvailable sets the provider availability for testing.}	return p.availablefunc (p *StubProvider) IsAvailable(ctx context.Context) bool {// IsAvailable checks if the provider is available.}	}, nil		Cost:  0.02,		Model: "stub-image-v1",		URL:   "https://placeholder.example.com/generated-image.png",	return &usecases.ImageResponse{	}	case <-time.After(p.delay):		return nil, ctx.Err()	case <-ctx.Done():	select {func (p *StubProvider) GenerateImage(ctx context.Context, request *usecases.ImageRequest) (*usecases.ImageResponse, error) {// GenerateImage performs a mock image generation.}	}, nil		Cost:      float64(inputTokens+outputTokens) * 0.00001,		TokensOut: outputTokens,		TokensIn:  inputTokens,		Model:     "stub-model-v1",		Content:   fmt.Sprintf("This is a stub response for prompt: %s", request.Prompt[:min(50, len(request.Prompt))]),	return &usecases.CompletionResponse{	outputTokens := inputTokens * 2	inputTokens := len(request.Prompt) / 4	// Generate mock response	}	case <-time.After(p.delay):		return nil, ctx.Err()	case <-ctx.Done():	select {func (p *StubProvider) Complete(ctx context.Context, request *usecases.CompletionRequest) (*usecases.CompletionResponse, error) {// Complete performs a mock text completion.}	return domain.ProviderTypeLocalfunc (p *StubProvider) Type() domain.ProviderType {// Type returns the provider type.}	return p.namefunc (p *StubProvider) Name() string {// Name returns the provider name.}	}		delay:     100 * time.Millisecond,		available: true,		name:      name,	return &StubProvider{func NewStubProvider(name string) *StubProvider {// NewStubProvider creates a new stub provider.}	delay     time.Duration	available bool	name      stringtype StubProvider struct {// StubProvider is a mock AI provider for testing and development.)	"github.com/ingvar/aiaggregator/packages/usecases"	"github.com/ingvar/aiaggregator/packages/domain"	"time"	"fmt"	"context"import (package providers// Package providers contains AI provider implementations.
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"time"
+
+	"github.com/ingvar/aiaggregator/packages/domain"
+	"github.com/ingvar/aiaggregator/packages/usecases"
+)
+
+// StubProvider is a test provider that returns mock responses.
+type StubProvider struct {
+	name      string
+	available bool
+	delay     time.Duration
+}
+
+// Ensure StubProvider implements AIProvider
+var _ usecases.AIProvider = (*StubProvider)(nil)
+
+// NewStubProvider creates a new stub provider.
+func NewStubProvider(name string) *StubProvider {
+	return &StubProvider{
+		name:      name,
+		available: true,
+		delay:     100 * time.Millisecond,
+	}
+}
+
+// Name returns the provider name.
+func (p *StubProvider) Name() string {
+	return p.name
+}
+
+// Type returns the provider type.
+func (p *StubProvider) Type() string {
+	return "LOCAL"
+}
+
+// IsAvailable checks if the provider is available.
+func (p *StubProvider) IsAvailable(ctx context.Context) bool {
+	return p.available
+}
+
+// SetAvailable sets the provider availability (for testing).
+func (p *StubProvider) SetAvailable(available bool) {
+	p.available = available
+}
+
+// SetDelay sets the processing delay (for testing).
+func (p *StubProvider) SetDelay(delay time.Duration) {
+	p.delay = delay
+}
+
+// Execute processes a job and returns a mock result.
+func (p *StubProvider) Execute(ctx context.Context, job *domain.Job) (*usecases.ProviderResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(p.delay):
+		// Continue processing
+	}
+
+	// Generate mock response based on job type
+	var response string
+	switch job.Type {
+	case domain.JobTypeText:
+		response = fmt.Sprintf("Stub response for input: %s", truncateInput(job.Input, 50))
+	case domain.JobTypeImage:
+		response = "https://example.com/stub-image.png"
+	default:
+		response = "Unknown job type"
+	}
+
+	// Generate mock token counts
+	tokensIn := len(job.Input) / 4 // Rough approximation
+	tokensOut := len(response) / 4
+
+	// Random cost between 0.001 and 0.01
+	cost := 0.001 + rand.Float64()*0.009
+
+	return &usecases.ProviderResult{
+		Result:    response,
+		TokensIn:  tokensIn,
+		TokensOut: tokensOut,
+		Cost:      cost,
+		Model:     "stub-model-v1",
+	}, nil
+}
+
+// truncateInput truncates input to a maximum length.
+func truncateInput(input string, maxLen int) string {
+	if len(input) <= maxLen {
+		return input
+	}
+	return input[:maxLen] + "..."
+}

@@ -17,7 +17,7 @@ type JobQueuePayload struct {
 // JobQueue defines the interface for job queue operations.
 type JobQueue interface {
 	// Enqueue adds a job to the processing queue.
-	Enqueue(ctx context.Context, payload *JobQueuePayload) error
+	Enqueue(ctx context.Context, jobID uuid.UUID) error
 	// Close closes the queue connection.
 	Close() error
 }

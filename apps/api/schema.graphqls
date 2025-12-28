@@ -1,0 +1,191 @@
+# GraphQL Schema for AI Aggregator API
+
+"""
+Job represents an AI processing request
+"""
+type Job {
+  id: ID!
+  tenantId: ID!
+  type: JobType!
+  input: String!
+  status: JobStatus!
+  result: String
+  error: String
+  provider: String
+  tokensIn: Int!
+  tokensOut: Int!
+  cost: Float!
+  createdAt: Time!
+  updatedAt: Time!
+  startedAt: Time
+  finishedAt: Time
+}
+
+"""
+JobType defines the type of AI request
+"""
+enum JobType {
+  TEXT
+  IMAGE
+}
+
+"""
+JobStatus represents the current state of a job
+"""
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+"""
+Tenant represents an organization with API access
+"""
+type Tenant {
+  id: ID!
+  name: String!
+  active: Boolean!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+"""
+Provider represents an AI provider
+"""
+type Provider {
+  id: ID!
+  name: String!
+  type: ProviderType!
+  enabled: Boolean!
+  priority: Int!
+}
+
+"""
+ProviderType defines the type of AI provider
+"""
+enum ProviderType {
+  OPENAI
+  CLAUDE
+  LOCAL
+  OLLAMA
+}
+
+"""
+Usage represents resource consumption
+"""
+type Usage {
+  id: ID!
+  tenantId: ID!
+  jobId: ID!
+  provider: String!
+  model: String
+  tokensIn: Int!
+  tokensOut: Int!
+  cost: Float!
+  createdAt: Time!
+}
+
+"""
+UsageSummary represents aggregated usage statistics
+"""
+type UsageSummary {
+  provider: String!
+  totalTokensIn: Int!
+  totalTokensOut: Int!
+  totalCost: Float!
+  jobCount: Int!
+}
+
+"""
+PageInfo contains pagination information
+"""
+type PageInfo {
+  totalCount: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+"""
+JobConnection represents a paginated list of jobs
+"""
+type JobConnection {
+  edges: [JobEdge!]!
+  pageInfo: PageInfo!
+}
+
+"""
+JobEdge represents an edge in the job connection
+"""
+type JobEdge {
+  node: Job!
+  cursor: String!
+}
+
+"""
+CreateJobInput represents input for creating a job
+"""
+input CreateJobInput {
+  type: JobType!
+  input: String!
+}
+
+"""
+JobsFilter represents filter options for jobs
+"""
+input JobsFilter {
+  status: JobStatus
+  type: JobType
+}
+
+"""
+PaginationInput represents pagination options
+"""
+input PaginationInput {
+  limit: Int
+  offset: Int
+}
+
+"""
+Custom scalar for timestamps
+"""
+scalar Time
+
+type Query {
+  """
+  Returns the authenticated tenant
+  """
+  me: Tenant
+
+  """
+  Get a job by ID
+  """
+  job(id: ID!): Job
+
+  """
+  List jobs with optional filtering and pagination
+  """
+  jobs(filter: JobsFilter, pagination: PaginationInput): JobConnection!
+
+  """
+  Get usage summary grouped by provider
+  """
+  usageSummary: [UsageSummary!]!
+
+  """
+  List available AI providers
+  """
+  providers: [Provider!]!
+}
+
+type Mutation {
+  """
+  Create a new AI processing job
+  """
+  createJob(input: CreateJobInput!): Job!
+
+  """
+  Cancel a pending job
+  """
+  cancelJob(id: ID!): Job
+}

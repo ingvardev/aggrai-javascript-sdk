@@ -11,8 +11,10 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/ingvar/aiaggregator/apps/worker/internal/handlers"
+	"github.com/ingvar/aiaggregator/packages/adapters"
 	"github.com/ingvar/aiaggregator/packages/providers"
 	"github.com/ingvar/aiaggregator/packages/shared"
+	"github.com/ingvar/aiaggregator/packages/usecases"
 )
 
 const (
@@ -37,12 +39,20 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to parse Redis URL")
 	}
 
+	// Initialize in-memory repositories (for development)
+	jobRepo := adapters.NewInMemoryJobRepository()
+	usageRepo := adapters.NewInMemoryUsageRepository()
+
 	// Initialize provider registry
 	registry := providers.NewProviderRegistry()
 	registry.Register(providers.NewStubProvider("stub-provider"))
+	log.Info().Msg("Stub provider registered")
+
+	// Initialize process job service
+	processService := usecases.NewProcessJobService(jobRepo, usageRepo, registry.Get)
 
 	// Create job handler
-	jobHandler := handlers.NewJobHandler(registry)
+	jobHandler := handlers.NewJobHandler(processService, "stub-provider")
 
 	// Create asynq server
 	srv := asynq.NewServer(

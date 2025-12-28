@@ -34,6 +34,24 @@ const (
 	JobTypeImage JobType = "IMAGE"
 )
 
+// AllJobType returns all possible job types.
+func AllJobType() []JobType {
+	return []JobType{JobTypeText, JobTypeImage}
+}
+
+// IsValid checks if the job type is valid.
+func (e JobType) IsValid() bool {
+	switch e {
+	case JobTypeText, JobTypeImage:
+		return true
+	}
+	return false
+}
+
+func (e JobType) String() string {
+	return string(e)
+}
+
 // JobStatus represents the status of a job.
 type JobStatus string
 
@@ -43,6 +61,24 @@ const (
 	JobStatusCompleted  JobStatus = "COMPLETED"
 	JobStatusFailed     JobStatus = "FAILED"
 )
+
+// AllJobStatus returns all possible job statuses.
+func AllJobStatus() []JobStatus {
+	return []JobStatus{JobStatusPending, JobStatusProcessing, JobStatusCompleted, JobStatusFailed}
+}
+
+// IsValid checks if the job status is valid.
+func (e JobStatus) IsValid() bool {
+	switch e {
+	case JobStatusPending, JobStatusProcessing, JobStatusCompleted, JobStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e JobStatus) String() string {
+	return string(e)
+}
 
 // Tenant represents an organization with API access.
 type Tenant struct {
@@ -71,6 +107,24 @@ const (
 	ProviderTypeLocal  ProviderType = "LOCAL"
 	ProviderTypeOllama ProviderType = "OLLAMA"
 )
+
+// AllProviderType returns all possible provider types.
+func AllProviderType() []ProviderType {
+	return []ProviderType{ProviderTypeOpenai, ProviderTypeClaude, ProviderTypeLocal, ProviderTypeOllama}
+}
+
+// IsValid checks if the provider type is valid.
+func (e ProviderType) IsValid() bool {
+	switch e {
+	case ProviderTypeOpenai, ProviderTypeClaude, ProviderTypeLocal, ProviderTypeOllama:
+		return true
+	}
+	return false
+}
+
+func (e ProviderType) String() string {
+	return string(e)
+}
 
 // Usage represents resource consumption.
 type Usage struct {

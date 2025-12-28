@@ -1,127 +1,127 @@
-package adapters
 // Package adapters contains infrastructure adapter implementations.
 package adapters
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	return count, err	err := r.pool.QueryRow(ctx, query, tenantID).Scan(&count)	var count int	query := `SELECT COUNT(*) FROM jobs WHERE tenant_id = $1`func (r *PostgresJobRepository) Count(ctx context.Context, tenantID uuid.UUID) (int, error) {// Count returns the total number of jobs for a tenant.}	return err	_, err := r.pool.Exec(ctx, query, id)	query := `DELETE FROM jobs WHERE id = $1`func (r *PostgresJobRepository) Delete(ctx context.Context, id uuid.UUID) error {// Delete removes a job from the database.}	return err	)		job.StartedAt, job.FinishedAt, job.UpdatedAt,		job.TokensIn, job.TokensOut, job.Cost,		job.ID, job.Status, job.Result, job.Error, job.Provider,	_, err := r.pool.Exec(ctx, query,	`		WHERE id = $1			started_at = $9, finished_at = $10, updated_at = $11			tokens_in = $6, tokens_out = $7, cost = $8,			status = $2, result = $3, error = $4, provider = $5,		UPDATE jobs SET	query := `func (r *PostgresJobRepository) Update(ctx context.Context, job *domain.Job) error {// Update updates an existing job in the database.}	return jobs, nil	}		jobs = append(jobs, job)		}			return nil, err		if err != nil {		)			&job.CreatedAt, &job.UpdatedAt, &job.StartedAt, &job.FinishedAt,			&job.TokensIn, &job.TokensOut, &job.Cost,			&job.Result, &job.Error, &job.Provider,			&job.ID, &job.TenantID, &job.Type, &job.Input, &job.Status,		err := rows.Scan(		job := &domain.Job{}	for rows.Next() {	var jobs []*domain.Job	defer rows.Close()	}		return nil, err	if err != nil {	rows, err := r.pool.Query(ctx, query, tenantID, limit, offset)	`		LIMIT $2 OFFSET $3		ORDER BY created_at DESC		WHERE tenant_id = $1		FROM jobs		       tokens_in, tokens_out, cost, created_at, updated_at, started_at, finished_at		SELECT id, tenant_id, type, input, status, result, error, provider,	query := `func (r *PostgresJobRepository) GetByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*domain.Job, error) {// GetByTenantID retrieves jobs for a tenant with pagination.}	return job, nil	}		return nil, err	if err != nil {	}		return nil, domain.ErrJobNotFound	if err == pgx.ErrNoRows {	)		&job.CreatedAt, &job.UpdatedAt, &job.StartedAt, &job.FinishedAt,		&job.TokensIn, &job.TokensOut, &job.Cost,		&job.Result, &job.Error, &job.Provider,		&job.ID, &job.TenantID, &job.Type, &job.Input, &job.Status,	err := row.Scan(	job := &domain.Job{}	row := r.pool.QueryRow(ctx, query, id)	`		FROM jobs WHERE id = $1		       tokens_in, tokens_out, cost, created_at, updated_at, started_at, finished_at		SELECT id, tenant_id, type, input, status, result, error, provider,	query := `func (r *PostgresJobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job, error) {// GetByID retrieves a job by its ID.}	return err	)		job.CreatedAt, job.UpdatedAt,		job.ID, job.TenantID, job.Type, job.Input, job.Status,	_, err := r.pool.Exec(ctx, query,	`		VALUES ($1, $2, $3, $4, $5, $6, $7)		INSERT INTO jobs (id, tenant_id, type, input, status, created_at, updated_at)	query := `func (r *PostgresJobRepository) Create(ctx context.Context, job *domain.Job) error {// Create inserts a new job into the database.}	return &PostgresJobRepository{pool: pool}func NewPostgresJobRepository(pool *pgxpool.Pool) *PostgresJobRepository {// NewPostgresJobRepository creates a new PostgreSQL job repository.}	pool *pgxpool.Pooltype PostgresJobRepository struct {// PostgresJobRepository implements JobRepository using PostgreSQL.)	"github.com/ingvar/aiaggregator/packages/domain"
+	"github.com/ingvar/aiaggregator/packages/domain"
+	"github.com/ingvar/aiaggregator/packages/usecases"
+)
+
+// InMemoryJobRepository is an in-memory implementation of JobRepository.
+type InMemoryJobRepository struct {
+	mu   sync.RWMutex
+	jobs map[uuid.UUID]*domain.Job
+}
+
+// Ensure InMemoryJobRepository implements JobRepository
+var _ usecases.JobRepository = (*InMemoryJobRepository)(nil)
+
+// NewInMemoryJobRepository creates a new in-memory job repository.
+func NewInMemoryJobRepository() *InMemoryJobRepository {
+	return &InMemoryJobRepository{
+		jobs: make(map[uuid.UUID]*domain.Job),
+	}
+}
+
+// Create saves a new job.
+func (r *InMemoryJobRepository) Create(ctx context.Context, job *domain.Job) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if job.ID == uuid.Nil {
+		job.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	if job.CreatedAt.IsZero() {
+		job.CreatedAt = now
+	}
+	job.UpdatedAt = now
+
+	r.jobs[job.ID] = job
+	return nil
+}
+
+// GetByID retrieves a job by ID.
+func (r *InMemoryJobRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Job, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	job, ok := r.jobs[id]
+	if !ok {
+		return nil, domain.ErrJobNotFound
+	}
+	return job, nil
+}
+
+// GetByTenantID retrieves jobs for a tenant with pagination.
+func (r *InMemoryJobRepository) GetByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*domain.Job, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []*domain.Job
+	for _, job := range r.jobs {
+		if job.TenantID == tenantID {
+			result = append(result, job)
+		}
+	}
+
+	// Sort by CreatedAt descending (newest first) - simplified
+	// In production, use proper sorting
+
+	// Apply pagination
+	if offset >= len(result) {
+		return []*domain.Job{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
+}
+
+// Update updates a job.
+func (r *InMemoryJobRepository) Update(ctx context.Context, job *domain.Job) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.jobs[job.ID]; !ok {
+		return domain.ErrJobNotFound
+	}
+
+	job.UpdatedAt = time.Now().UTC()
+	r.jobs[job.ID] = job
+	return nil
+}
+
+// Delete removes a job.
+func (r *InMemoryJobRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.jobs[id]; !ok {
+		return domain.ErrJobNotFound
+	}
+
+	delete(r.jobs, id)
+	return nil
+}
+
+// Count returns the total number of jobs for a tenant.
+func (r *InMemoryJobRepository) Count(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	count := 0
+	for _, job := range r.jobs {
+		if job.TenantID == tenantID {
+			count++
+		}
+	}
+	return count, nil
+}

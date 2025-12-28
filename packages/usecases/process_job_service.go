@@ -1,128 +1,116 @@
-package usecases
 // Package usecases contains application business logic and use case implementations.
 package usecases
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ingvar/aiaggregator/packages/domain"
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	return s.usageRepo.Create(ctx, usage)	)		response.Cost,		0,		0,		response.Model,		provider.Name(),		job.ID,		job.TenantID,	usage := domain.NewUsage(	// Record usage	}		return err	if err := s.jobRepo.Update(ctx, job); err != nil {	job.MarkCompleted(response.URL, 0, 0, response.Cost)	}		return s.jobRepo.Update(ctx, job)		job.MarkFailed(err.Error())	if err != nil {	response, err := provider.GenerateImage(ctx, request)	}		Size:   "1024x1024",		Prompt: job.Input,		JobID:  job.ID,	request := &ImageRequest{func (s *ProcessJobService) processImageJob(ctx context.Context, job *domain.Job, provider AIProvider) error {}	return s.usageRepo.Create(ctx, usage)	)		response.Cost,		response.TokensOut,		response.TokensIn,		response.Model,		provider.Name(),		job.ID,		job.TenantID,	usage := domain.NewUsage(	// Record usage	}		return err	if err := s.jobRepo.Update(ctx, job); err != nil {	job.MarkCompleted(response.Content, response.TokensIn, response.TokensOut, response.Cost)	}		return s.jobRepo.Update(ctx, job)		job.MarkFailed(err.Error())	if err != nil {	response, err := provider.Complete(ctx, request)	}		MaxTokens: 2048,		Prompt:    job.Input,		JobID:     job.ID,	request := &CompletionRequest{func (s *ProcessJobService) processTextJob(ctx context.Context, job *domain.Job, provider AIProvider) error {}	}		return s.jobRepo.Update(ctx, job)		job.MarkFailed("unsupported job type")	default:		return s.processImageJob(ctx, job, provider)	case domain.JobTypeImage:		return s.processTextJob(ctx, job, provider)	case domain.JobTypeText:	switch job.Type {	// Process based on job type	}		return err	if err := s.jobRepo.Update(ctx, job); err != nil {	job.MarkProcessing(provider.Name())	}		return s.jobRepo.Update(ctx, job)		job.MarkFailed(err.Error())	if err != nil {	provider, err := s.providerSelector.SelectProvider(ctx, job.Type)	// Select provider	}		return nil // Job already processed	if job.IsTerminal() {	}		return err	if err != nil {	job, err := s.jobRepo.GetByID(ctx, jobID)func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {// ProcessJob processes a job using the selected AI provider.}	}		providerSelector: providerSelector,		usageRepo:        usageRepo,		jobRepo:          jobRepo,	return &ProcessJobService{) *ProcessJobService {	providerSelector ProviderSelector,	usageRepo UsageRepository,	jobRepo JobRepository,func NewProcessJobService(// NewProcessJobService creates a new process job service.}	providerSelector ProviderSelector	usageRepo        UsageRepository	jobRepo          JobRepositorytype ProcessJobService struct {// ProcessJobService handles job processing business logic.
+// ProcessJobService handles job processing logic.
+type ProcessJobService struct {
+	jobRepo    JobRepository
+	usageRepo  UsageRepository
+	providerFn func(name string) (AIProvider, bool)
+}
+
+// NewProcessJobService creates a new process job service.
+func NewProcessJobService(
+	jobRepo JobRepository,
+	usageRepo UsageRepository,
+	providerFn func(name string) (AIProvider, bool),
+) *ProcessJobService {
+	return &ProcessJobService{
+		jobRepo:    jobRepo,
+		usageRepo:  usageRepo,
+		providerFn: providerFn,
+	}
+}
+
+// ProcessJob processes a job with the specified provider.
+func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID, providerName string) error {
+	job, err := s.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return err
+	}
+
+	// Get the provider
+	provider, ok := s.providerFn(providerName)
+	if !ok {
+		job.MarkFailed("provider not found: " + providerName)
+		return s.jobRepo.Update(ctx, job)
+	}
+
+	// Check provider availability
+	if !provider.IsAvailable(ctx) {
+		job.MarkFailed("provider not available: " + providerName)
+		return s.jobRepo.Update(ctx, job)
+	}
+
+	// Mark job as processing
+	job.MarkProcessing(providerName)
+	if err := s.jobRepo.Update(ctx, job); err != nil {
+		return err
+	}
+
+	// Execute the job
+	result, err := provider.Execute(ctx, job)
+	if err != nil {
+		job.MarkFailed(err.Error())
+		return s.jobRepo.Update(ctx, job)
+	}
+
+	// Mark job as completed
+	job.MarkCompleted(result.Result, result.TokensIn, result.TokensOut, result.Cost)
+	if err := s.jobRepo.Update(ctx, job); err != nil {
+		return err
+	}
+
+	// Record usage
+	usage := &domain.Usage{
+		ID:        uuid.New(),
+		TenantID:  job.TenantID,
+		JobID:     job.ID,
+		Provider:  providerName,
+		Model:     result.Model,
+		TokensIn:  result.TokensIn,
+		TokensOut: result.TokensOut,
+		Cost:      result.Cost,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	if s.usageRepo != nil {
+		if err := s.usageRepo.Create(ctx, usage); err != nil {
+			// Log error but don't fail the job
+			// TODO: add logging
+		}
+	}
+
+	return nil
+}
+
+// ProcessJobWithAutoProvider processes a job, automatically selecting the best available provider.
+func (s *ProcessJobService) ProcessJobWithAutoProvider(ctx context.Context, jobID uuid.UUID, providers []string) error {
+	// Try providers in order until one succeeds
+	for _, providerName := range providers {
+		provider, ok := s.providerFn(providerName)
+		if !ok {
+			continue
+		}
+
+		if provider.IsAvailable(ctx) {
+			return s.ProcessJob(ctx, jobID, providerName)
+		}
+	}
+
+	// No provider available
+	job, err := s.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return err
+	}
+
+	job.MarkFailed("no available providers")
+	return s.jobRepo.Update(ctx, job)
+}

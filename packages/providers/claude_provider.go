@@ -51,8 +51,8 @@ func (p *ClaudeProvider) Name() string {
 }
 
 // Type returns the provider type.
-func (p *ClaudeProvider) Type() domain.ProviderType {
-	return domain.ProviderTypeClaude
+func (p *ClaudeProvider) Type() string {
+	return string(domain.ProviderTypeClaude)
 }
 
 // claudeRequest represents Claude API request.
@@ -150,3 +150,35 @@ func (p *ClaudeProvider) GenerateImage(ctx context.Context, request *usecases.Im
 func (p *ClaudeProvider) IsAvailable(ctx context.Context) bool {
 	return p.apiKey != ""
 }
+
+// Execute processes a job and returns the result.
+// This is the main interface method for AIProvider.
+func (p *ClaudeProvider) Execute(ctx context.Context, job *domain.Job) (*usecases.ProviderResult, error) {
+	switch job.Type {
+	case domain.JobTypeText:
+		resp, err := p.Complete(ctx, &usecases.CompletionRequest{
+			JobID:     job.ID,
+			Prompt:    job.Input,
+			MaxTokens: 2048,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &usecases.ProviderResult{
+			Result:    resp.Content,
+			TokensIn:  resp.TokensIn,
+			TokensOut: resp.TokensOut,
+			Cost:      resp.Cost,
+			Model:     resp.Model,
+		}, nil
+
+	case domain.JobTypeImage:
+		return nil, fmt.Errorf("Claude does not support image generation")
+
+	default:
+		return nil, fmt.Errorf("unsupported job type: %s", job.Type)
+	}
+}
+
+// Ensure ClaudeProvider implements AIProvider
+var _ usecases.AIProvider = (*ClaudeProvider)(nil)

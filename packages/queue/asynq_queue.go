@@ -21,6 +21,9 @@ type AsynqQueue struct {
 	client *asynq.Client
 }
 
+// Ensure AsynqQueue implements JobQueue
+var _ usecases.JobQueue = (*AsynqQueue)(nil)
+
 // NewAsynqQueue creates a new asynq-based job queue.
 func NewAsynqQueue(redisURL string) (*AsynqQueue, error) {
 	opt, err := asynq.ParseRedisURI(redisURL)

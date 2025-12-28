@@ -1,128 +1,65 @@
-package handlers
 // Package handlers contains task handlers for the worker.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	return nil	// This would be done via repository in a real implementation	// TODO: Update job in database with result		Msg("Image job completed")		Float64("cost", response.Cost).		Str("url", response.URL).		Str("job_id", payload.JobID.String()).	log.Info().	}		return err		log.Error().Err(err).Str("job_id", payload.JobID.String()).Msg("Image generation failed")	if err != nil {	response, err := provider.GenerateImage(ctx, request)	}		Size:   "1024x1024",		Prompt: payload.Input,		JobID:  payload.JobID,	request := &usecases.ImageRequest{func (h *JobHandler) processImageJob(ctx context.Context, payload *JobPayload, provider usecases.AIProvider) error {}	return nil	// This would be done via repository in a real implementation	// TODO: Update job in database with result		Msg("Job completed")		Float64("cost", response.Cost).		Int("tokens_out", response.TokensOut).		Int("tokens_in", response.TokensIn).		Str("job_id", payload.JobID.String()).	log.Info().	}		return err		log.Error().Err(err).Str("job_id", payload.JobID.String()).Msg("Completion failed")	if err != nil {	response, err := provider.Complete(ctx, request)	}		MaxTokens: 2048,		Prompt:    payload.Input,		JobID:     payload.JobID,	request := &usecases.CompletionRequest{func (h *JobHandler) processTextJob(ctx context.Context, payload *JobPayload, provider usecases.AIProvider) error {}	}		return nil		log.Error().Str("type", payload.Type).Msg("Unknown job type")	default:		return h.processImageJob(ctx, &payload, provider)	case domain.JobTypeImage:		return h.processTextJob(ctx, &payload, provider)	case domain.JobTypeText:	switch jobType {	// Process based on job type		Msg("Selected provider")		Str("provider", provider.Name()).		Str("job_id", payload.JobID.String()).	log.Info().	}		return err		log.Error().Err(err).Msg("No available provider")	if err != nil {	provider, err := h.registry.SelectProvider(ctx, jobType)	jobType := domain.JobType(payload.Type)	// Select provider		Msg("Processing job")		Str("type", payload.Type).		Str("job_id", payload.JobID.String()).	log.Info().	}		return err		log.Error().Err(err).Msg("Failed to unmarshal task payload")	if err := json.Unmarshal(task.Payload(), &payload); err != nil {	var payload JobPayloadfunc (h *JobHandler) HandleProcessJob(ctx context.Context, task *asynq.Task) error {// HandleProcessJob processes a job task.}	}		registry: registry,	return &JobHandler{func NewJobHandler(registry *providers.ProviderRegistry) *JobHandler {// NewJobHandler creates a new job handler.}	registry *providers.ProviderRegistrytype JobHandler struct {// JobHandler handles job processing tasks.}	Input    string    `json:"input"`	Type     string    `json:"type"`	TenantID uuid.UUID `json:"tenant_id"`	JobID    uuid.UUID `json:"job_id"`type JobPayload struct {// JobPayload represents the job processing payload.var log = shared.NewLogger("job-handler"))	"github.com/ingvar/aiaggregator/packages/usecases"	"github.com/ingvar/aiaggregator/packages/shared"	"github.com/ingvar/aiaggregator/packages/providers"	"github.com/ingvar/aiaggregator/packages/domain"	"github.com/hibiken/asynq"	"github.com/google/uuid"	"encoding/json"	"context"import (package handlers
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
+
+	"github.com/ingvar/aiaggregator/packages/shared"
+	"github.com/ingvar/aiaggregator/packages/usecases"
+)
+
+var log = shared.NewLogger("job-handler")
+
+// JobPayload represents the job processing payload.
+type JobPayload struct {
+	JobID    uuid.UUID `json:"job_id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+	Type     string    `json:"type"`
+	Input    string    `json:"input"`
+}
+
+// JobHandler handles job processing tasks.
+type JobHandler struct {
+	processService  *usecases.ProcessJobService
+	defaultProvider string
+}
+
+// NewJobHandler creates a new job handler.
+func NewJobHandler(processService *usecases.ProcessJobService, defaultProvider string) *JobHandler {
+	return &JobHandler{
+		processService:  processService,
+		defaultProvider: defaultProvider,
+	}
+}
+
+// HandleProcessJob processes a job task.
+func (h *JobHandler) HandleProcessJob(ctx context.Context, task *asynq.Task) error {
+	var payload usecases.JobQueuePayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		log.Error().Err(err).Msg("Failed to unmarshal task payload")
+		return err
+	}
+
+	log.Info().
+		Str("job_id", payload.JobID.String()).
+		Msg("Processing job")
+
+	// Process the job using the default provider
+	err := h.processService.ProcessJob(ctx, payload.JobID, h.defaultProvider)
+	if err != nil {
+		log.Error().Err(err).
+			Str("job_id", payload.JobID.String()).
+			Msg("Job processing failed")
+		return err
+	}
+
+	log.Info().
+		Str("job_id", payload.JobID.String()).
+		Msg("Job completed successfully")
+
+	return nil
+}

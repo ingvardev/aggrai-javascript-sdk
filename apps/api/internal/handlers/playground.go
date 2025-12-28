@@ -1,61 +1,57 @@
-package handlers
 // Package handlers contains HTTP handlers for the API.
+package handlers
 
+import (
+	"html/template"
+	"net/http"
+)
 
+const playgroundTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Aggregator - GraphQL Playground</title>
+  <link rel="stylesheet" href="https://unpkg.com/graphiql/graphiql.min.css" />
+  <style>
+    body {
+      height: 100%;
+      margin: 0;
+      width: 100%;
+      overflow: hidden;
+    }
+    #graphiql {
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="graphiql">Loading...</div>
+  <script crossorigin src="https://unpkg.com/react/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/graphiql/graphiql.min.js"></script>
+  <script>
+    const fetcher = GraphiQL.createFetcher({
+      url: '{{.Endpoint}}',
+      headers: {
+        'X-API-Key': 'dev-api-key-12345'
+      }
+    });
 
+    ReactDOM.render(
+      React.createElement(GraphiQL, { fetcher: fetcher }),
+      document.getElementById('graphiql'),
+    );
+  </script>
+</body>
+</html>`
 
+// PlaygroundHandler returns the GraphQL playground.
+func PlaygroundHandler(endpoint string) http.HandlerFunc {
+	tmpl := template.Must(template.New("playground").Parse(playgroundTemplate))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	}		})			"Endpoint": endpoint,		tmpl.Execute(w, map[string]string{		w.Header().Set("Content-Type", "text/html; charset=utf-8")	return func(w http.ResponseWriter, r *http.Request) {	tmpl := template.Must(template.New("playground").Parse(playgroundTemplate))func PlaygroundHandler(endpoint string) http.HandlerFunc {// PlaygroundHandler returns the GraphQL playground.`</html></body>  </script>    );      document.getElementById('graphiql'),      React.createElement(GraphiQL, { fetcher: fetcher }),    ReactDOM.render(    });      }        'X-API-Key': 'dev-api-key-12345'      headers: {      url: '{{.Endpoint}}',    const fetcher = GraphiQL.createFetcher({  <script>  <script crossorigin src="https://unpkg.com/graphiql/graphiql.min.js"></script>  <script crossorigin src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>  <script crossorigin src="https://unpkg.com/react/umd/react.production.min.js"></script>  <div id="graphiql">Loading...</div><body></head>  </style>    }      height: 100vh;    #graphiql {    }      overflow: hidden;      width: 100%;      margin: 0;      height: 100%;    body {  <style>  <link rel="stylesheet" href="https://unpkg.com/graphiql/graphiql.min.css" />  <title>AI Aggregator - GraphQL Playground</title><head><html><!DOCTYPE html>const playgroundTemplate = `)	"net/http"	"html/template"import (package handlers
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		tmpl.Execute(w, map[string]string{
+			"Endpoint": endpoint,
+		})
+	}
+}
