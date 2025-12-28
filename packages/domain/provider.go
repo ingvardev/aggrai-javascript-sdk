@@ -31,21 +31,3 @@ type Provider struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
-
-// NewProvider creates a new provider.
-func NewProvider(name string, providerType ProviderType, endpoint, apiKey, model string) *Provider {
-	now := time.Now()
-	return &Provider{
-		ID:        uuid.New(),
-		Name:      name,
-		Type:      providerType,
-		Endpoint:  endpoint,
-		APIKey:    apiKey,
-		Model:     model,
-		Enabled:   true,
-		Priority:  0,
-		Config:    make(map[string]interface{}),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-}

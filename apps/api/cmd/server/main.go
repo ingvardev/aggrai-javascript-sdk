@@ -209,8 +209,11 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// Health check (public)
-	r.Get("/health", handlers.HealthHandler)
+	// Health checks (public, no auth required)
+	healthChecker := handlers.NewHealthChecker(pool, cfg.RedisURL)
+	r.Get("/health", healthChecker.HealthHandler)   // Full health with dependency checks
+	r.Get("/healthz", healthChecker.LiveHandler)    // Kubernetes liveness probe
+	r.Get("/readyz", healthChecker.ReadyHandler)    // Kubernetes readiness probe
 
 	// GraphQL playground (public in dev)
 	if cfg.EnablePlayground {

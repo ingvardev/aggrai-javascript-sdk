@@ -135,27 +135,3 @@ func (s *ProcessJobService) ProcessJob(ctx context.Context, jobID uuid.UUID, pro
 
 	return nil
 }
-
-// ProcessJobWithAutoProvider processes a job, automatically selecting the best available provider.
-func (s *ProcessJobService) ProcessJobWithAutoProvider(ctx context.Context, jobID uuid.UUID, providers []string) error {
-	// Try providers in order until one succeeds
-	for _, providerName := range providers {
-		provider, ok := s.providerFn(providerName)
-		if !ok {
-			continue
-		}
-
-		if provider.IsAvailable(ctx) {
-			return s.ProcessJob(ctx, jobID, providerName)
-		}
-	}
-
-	// No provider available
-	job, err := s.jobRepo.GetByID(ctx, jobID)
-	if err != nil {
-		return err
-	}
-
-	job.MarkFailed("no available providers")
-	return s.jobRepo.Update(ctx, job)
-}

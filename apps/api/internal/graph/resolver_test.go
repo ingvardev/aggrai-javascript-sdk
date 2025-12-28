@@ -136,6 +136,82 @@ func (q *mockJobQueue) Close() error {
 	return nil
 }
 
+// mockUsageRepo implements usecases.UsageRepository for testing
+type mockUsageRepo struct {
+	usages map[uuid.UUID]*domain.Usage
+}
+
+func newMockUsageRepo() *mockUsageRepo {
+	return &mockUsageRepo{usages: make(map[uuid.UUID]*domain.Usage)}
+}
+
+func (r *mockUsageRepo) Create(ctx context.Context, usage *domain.Usage) error {
+	r.usages[usage.JobID] = usage
+	return nil
+}
+
+func (r *mockUsageRepo) GetByJobID(ctx context.Context, jobID uuid.UUID) (*domain.Usage, error) {
+	if usage, ok := r.usages[jobID]; ok {
+		return usage, nil
+	}
+	return nil, nil
+}
+
+func (r *mockUsageRepo) GetByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]*domain.Usage, error) {
+	return []*domain.Usage{}, nil
+}
+
+func (r *mockUsageRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) ([]*domain.UsageSummary, error) {
+	return []*domain.UsageSummary{}, nil
+}
+
+// mockPricingRepo implements usecases.PricingRepository for testing
+type mockPricingRepo struct {
+	pricings map[uuid.UUID]*domain.ProviderPricing
+}
+
+func newMockPricingRepo() *mockPricingRepo {
+	return &mockPricingRepo{pricings: make(map[uuid.UUID]*domain.ProviderPricing)}
+}
+
+func (r *mockPricingRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.ProviderPricing, error) {
+	if pricing, ok := r.pricings[id]; ok {
+		return pricing, nil
+	}
+	return nil, nil
+}
+
+func (r *mockPricingRepo) GetByProviderModel(ctx context.Context, provider, model string) (*domain.ProviderPricing, error) {
+	return nil, nil
+}
+
+func (r *mockPricingRepo) GetDefaultByProvider(ctx context.Context, provider string) (*domain.ProviderPricing, error) {
+	return nil, nil
+}
+
+func (r *mockPricingRepo) List(ctx context.Context) ([]*domain.ProviderPricing, error) {
+	return []*domain.ProviderPricing{}, nil
+}
+
+func (r *mockPricingRepo) ListByProvider(ctx context.Context, provider string) ([]*domain.ProviderPricing, error) {
+	return []*domain.ProviderPricing{}, nil
+}
+
+func (r *mockPricingRepo) Create(ctx context.Context, pricing *domain.ProviderPricing) error {
+	r.pricings[pricing.ID] = pricing
+	return nil
+}
+
+func (r *mockPricingRepo) Update(ctx context.Context, pricing *domain.ProviderPricing) error {
+	r.pricings[pricing.ID] = pricing
+	return nil
+}
+
+func (r *mockPricingRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	delete(r.pricings, id)
+	return nil
+}
+
 func setupTestServer(t *testing.T) (*httptest.Server, *domain.Tenant) {
 	jobRepo := newMockJobRepo()
 	tenantRepo := newMockTenantRepo()
@@ -149,7 +225,12 @@ func setupTestServer(t *testing.T) (*httptest.Server, *domain.Tenant) {
 	authService := usecases.NewAuthService(tenantRepo)
 	providerRegistry := providers.NewProviderRegistry()
 
-	resolver := NewResolver(jobService, authService, providerRegistry)
+	// Create mock usage repo and pricing service for test
+	usageRepo := newMockUsageRepo()
+	pricingRepo := newMockPricingRepo()
+	pricingService := usecases.NewPricingService(pricingRepo)
+
+	resolver := NewResolver(jobService, authService, tenantRepo, usageRepo, pricingService, providerRegistry)
 	handler := NewServer(resolver)
 
 	return httptest.NewServer(handler), tenant

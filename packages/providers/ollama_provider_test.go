@@ -162,8 +162,8 @@ func TestOllamaProvider_ListModels(t *testing.T) {
 
 	expected := []string{"llama3.2", "codellama", "mistral"}
 	for i, m := range expected {
-		if models[i] != m {
-			t.Errorf("expected model %q at index %d, got %q", m, i, models[i])
+		if models[i].ID != m {
+			t.Errorf("expected model %q at index %d, got %q", m, i, models[i].ID)
 		}
 	}
 }
