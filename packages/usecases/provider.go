@@ -64,6 +64,40 @@ type ImageResponse struct {
 	Cost  float64
 }
 
+// StreamingProvider interface for providers that support streaming responses.
+type StreamingProvider interface {
+	AIProvider
+	// CompleteStream performs a streaming text completion request.
+	// Calls onChunk for each received text chunk.
+	// Returns final token counts and cost when stream completes.
+	CompleteStream(ctx context.Context, request *CompletionRequest, onChunk func(chunk string)) (*CompletionResponse, error)
+}
+
+// StreamChunk represents a chunk of streaming response.
+type StreamChunk struct {
+	Content      string `json:"content"`
+	Done         bool   `json:"done"`
+	TokensIn     int    `json:"tokensIn,omitempty"`
+	TokensOut    int    `json:"tokensOut,omitempty"`
+	Cost         float64 `json:"cost,omitempty"`
+	Error        string `json:"error,omitempty"`
+}
+
+// ModelInfo represents information about an available model.
+type ModelInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	MaxTokens   int    `json:"maxTokens,omitempty"`
+}
+
+// ModelListProvider interface for providers that can list available models.
+type ModelListProvider interface {
+	AIProvider
+	// ListModels returns a list of available models for this provider.
+	ListModels(ctx context.Context) ([]ModelInfo, error)
+}
+
 // ProviderSelector selects the best available provider for a request.
 type ProviderSelector interface {
 	SelectProvider(ctx context.Context, jobType domain.JobType) (AIProvider, error)

@@ -10,11 +10,13 @@ import {
   BarChart3,
   Cpu,
   HelpCircle,
+  MessageSquare,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Jobs', href: '/jobs', icon: Zap },
   { name: 'Providers', href: '/providers', icon: Cpu },
   { name: 'Usage', href: '/usage', icon: BarChart3 },

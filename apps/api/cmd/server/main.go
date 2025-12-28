@@ -220,10 +220,14 @@ func main() {
 	graphResolver := graph.NewResolver(jobService, authService, tenantRepo, usageRepo, pricingService, providerRegistry)
 	graphServer := graph.NewServer(graphResolver)
 
-	// Apply auth middleware for GraphQL
+	// Streaming handler
+	streamHandler := handlers.NewStreamHandler(providerRegistry, authService)
+
+	// Apply auth middleware for GraphQL and streaming
 	r.Group(func(r chi.Router) {
 		r.Use(appMiddleware.AuthMiddleware(authService))
 		r.Handle("/graphql", graphServer)
+		r.Handle("/stream", streamHandler)
 	})
 
 	// Create server

@@ -331,6 +331,40 @@ func (r *queryResolver) Providers(ctx context.Context) ([]*Provider, error) {
 	return result, nil
 }
 
+// ProviderModels is the resolver for the providerModels field.
+func (r *queryResolver) ProviderModels(ctx context.Context, provider string) ([]*ModelInfo, error) {
+	// Get the provider from registry
+	p, ok := r.providerRegistry.Get(provider)
+	if !ok {
+		return nil, fmt.Errorf("provider not found: %s", provider)
+	}
+
+	// Check if provider implements ModelListProvider
+	modelProvider, ok := p.(usecases.ModelListProvider)
+	if !ok {
+		return nil, fmt.Errorf("provider %s does not support listing models", provider)
+	}
+
+	// Get models from provider
+	models, err := modelProvider.ListModels(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL type
+	result := make([]*ModelInfo, len(models))
+	for i, m := range models {
+		result[i] = &ModelInfo{
+			ID:          m.ID,
+			Name:        m.Name,
+			Description: &m.Description,
+			MaxTokens:   &m.MaxTokens,
+		}
+	}
+
+	return result, nil
+}
+
 // PricingList is the resolver for the pricingList field.
 func (r *queryResolver) PricingList(ctx context.Context) ([]*ProviderPricing, error) {
 	tenant := middleware.TenantFromContext(ctx)

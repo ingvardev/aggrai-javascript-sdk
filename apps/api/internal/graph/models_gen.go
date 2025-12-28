@@ -57,6 +57,13 @@ type JobsFilter struct {
 	Type   *JobType   `json:"type,omitempty"`
 }
 
+type ModelInfo struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	MaxTokens   *int    `json:"maxTokens,omitempty"`
+}
+
 type Mutation struct {
 }
 

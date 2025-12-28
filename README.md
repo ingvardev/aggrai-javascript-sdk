@@ -48,7 +48,7 @@ docker compose up -d postgres redis
 ### 3. Запуск API сервера
 
 ```bash
-go run ./apps/api/cmd/server
+lsof -ti:8080 | xargs kill -9 2>/dev/null; sleep 1 && go run ./apps/api/cmd/server
 ```
 
 ### 4. Запуск Worker (в отдельном терминале)

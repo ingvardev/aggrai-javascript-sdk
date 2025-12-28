@@ -35,6 +35,13 @@ export interface Provider {
   priority: number
 }
 
+export interface ModelInfo {
+  id: string
+  name: string
+  description?: string
+  maxTokens?: number
+}
+
 export interface UsageSummary {
   provider: string
   totalTokensIn: number
@@ -101,6 +108,17 @@ export const PROVIDERS_QUERY = `
       type
       enabled
       priority
+    }
+  }
+`
+
+export const PROVIDER_MODELS_QUERY = `
+  query ProviderModels($provider: String!) {
+    providerModels(provider: $provider) {
+      id
+      name
+      description
+      maxTokens
     }
   }
 `

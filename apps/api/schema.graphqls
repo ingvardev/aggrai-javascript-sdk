@@ -151,6 +151,16 @@ Custom scalar for timestamps
 """
 scalar Time
 
+"""
+ModelInfo represents an AI model available from a provider
+"""
+type ModelInfo {
+  id: String!
+  name: String!
+  description: String
+  maxTokens: Int
+}
+
 type Query {
   """
   Returns the authenticated tenant
@@ -176,6 +186,11 @@ type Query {
   List available AI providers
   """
   providers: [Provider!]!
+
+  """
+  List available models for a specific provider
+  """
+  providerModels(provider: String!): [ModelInfo!]!
 }
 
 type Mutation {

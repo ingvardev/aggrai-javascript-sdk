@@ -198,7 +198,7 @@ func (p *OllamaProvider) Execute(ctx context.Context, job *domain.Job) (*usecase
 }
 
 // ListModels returns available models from Ollama.
-func (p *OllamaProvider) ListModels(ctx context.Context) ([]string, error) {
+func (p *OllamaProvider) ListModels(ctx context.Context) ([]usecases.ModelInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", p.endpoint+"/api/tags", nil)
 	if err != nil {
 		return nil, err
@@ -216,19 +216,27 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]string, error) {
 
 	var result struct {
 		Models []struct {
-			Name string `json:"name"`
+			Name       string `json:"name"`
+			ModifiedAt string `json:"modified_at"`
+			Size       int64  `json:"size"`
 		} `json:"models"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	models := make([]string, len(result.Models))
+	models := make([]usecases.ModelInfo, len(result.Models))
 	for i, m := range result.Models {
-		models[i] = m.Name
+		models[i] = usecases.ModelInfo{
+			ID:   m.Name,
+			Name: m.Name,
+		}
 	}
 	return models, nil
 }
 
 // Ensure OllamaProvider implements AIProvider
 var _ usecases.AIProvider = (*OllamaProvider)(nil)
+
+// Ensure OllamaProvider implements ModelListProvider
+var _ usecases.ModelListProvider = (*OllamaProvider)(nil)

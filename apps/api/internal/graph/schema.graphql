@@ -182,6 +182,14 @@ input PaginationInput {
   offset: Int = 0
 }
 
+# Model information from a provider
+type ModelInfo {
+  id: String!
+  name: String!
+  description: String
+  maxTokens: Int
+}
+
 # Queries
 type Query {
   # Get current authenticated tenant
@@ -198,6 +206,9 @@ type Query {
 
   # List available providers
   providers: [Provider!]!
+
+  # List available models for a specific provider
+  providerModels(provider: String!): [ModelInfo!]!
 
   # List all pricing configurations
   pricingList: [ProviderPricing!]!
