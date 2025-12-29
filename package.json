@@ -1,0 +1,47 @@
+{
+  "name": "@aiaggregator/sdk",
+  "version": "0.1.0",
+  "description": "JavaScript SDK for AI Aggregator async API",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "ai",
+    "openai",
+    "claude",
+    "llm",
+    "aggregator",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "eslint": "^8.55.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
