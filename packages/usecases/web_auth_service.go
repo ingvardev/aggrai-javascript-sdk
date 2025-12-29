@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -63,6 +64,7 @@ type LoginResult struct {
 func (s *WebAuthService) Login(ctx context.Context, req *LoginRequest) *LoginResult {
 	owner, err := s.ownerRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
+		log.Debug().Err(err).Str("email", req.Email).Msg("Login: owner not found")
 		s.logAuditEvent(ctx, nil, nil, domain.AuditActionAuthFailed, req.IP, req.UserAgent, map[string]interface{}{
 			"email":  req.Email,
 			"reason": "not_found",
@@ -70,8 +72,11 @@ func (s *WebAuthService) Login(ctx context.Context, req *LoginRequest) *LoginRes
 		return &LoginResult{Success: false, Error: domain.ErrInvalidCredentials}
 	}
 
+	log.Debug().Str("email", owner.Email).Str("hash", owner.PasswordHash[:20]).Msg("Login: owner found, checking password")
+
 	// Check if can login
 	if err := owner.CanLogin(); err != nil {
+		log.Debug().Err(err).Msg("Login: CanLogin failed")
 		s.logAuditEvent(ctx, &owner.TenantID, &owner.ID, domain.AuditActionAuthFailed, req.IP, req.UserAgent, map[string]interface{}{
 			"reason": err.Error(),
 		})
@@ -80,6 +85,7 @@ func (s *WebAuthService) Login(ctx context.Context, req *LoginRequest) *LoginRes
 
 	// Verify password
 	if !owner.CheckPassword(req.Password) {
+		log.Debug().Str("password_len", fmt.Sprintf("%d", len(req.Password))).Msg("Login: password check failed")
 		_ = s.ownerRepo.IncrementFailedAttempts(ctx, owner.ID)
 
 		// Lock account after too many attempts

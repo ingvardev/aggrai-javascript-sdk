@@ -23,6 +23,8 @@ const (
 	TenantIDContextKey contextKey = "tenant_id"
 	// APIUserIDContextKey is the context key for the API user ID.
 	APIUserIDContextKey contextKey = "api_user_id"
+	// SessionTokenContextKey is the context key for the session token (owner auth).
+	SessionTokenContextKey contextKey = "session_token"
 )
 
 // TenantFromContext retrieves the tenant from the request context.
@@ -76,8 +78,22 @@ func AuthMiddleware(authService *usecases.AuthService) func(http.Handler) http.H
 				return
 			}
 
+			// Check for session token first (owner auth for dashboard)
+			sessionToken := extractSessionToken(r)
+			if sessionToken != "" {
+				// Session-based auth - pass through, resolver will validate
+				ctx := context.WithValue(r.Context(), SessionTokenContextKey, sessionToken)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
 			apiKey := extractAPIKey(r)
 			if apiKey == "" {
+				// Allow GraphQL requests without auth for public operations (login, register)
+				if r.URL.Path == "/graphql" || r.URL.Path == "/query" {
+					next.ServeHTTP(w, r)
+					return
+				}
 				http.Error(w, "Unauthorized: missing API key", http.StatusUnauthorized)
 				return
 			}

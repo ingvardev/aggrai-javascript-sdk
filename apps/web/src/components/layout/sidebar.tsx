@@ -12,6 +12,8 @@ import {
   Cpu,
   HelpCircle,
   MessageSquare,
+  Users,
+  BookOpen,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { LanguageSwitcher } from '@/components/language-switcher'
@@ -26,11 +28,13 @@ export function Sidebar() {
     { name: t('nav.jobs'), href: '/jobs', icon: Zap },
     { name: t('nav.providers'), href: '/providers', icon: Cpu },
     { name: t('nav.usage'), href: '/usage', icon: BarChart3 },
+    { name: t('nav.users'), href: '/users', icon: Users },
     { name: t('nav.settings'), href: '/settings', icon: Settings },
   ]
 
   const secondaryNavigation = [
     { name: 'Documentation', href: '/docs', icon: HelpCircle },
+    { name: 'API Guide', href: '/docs/api-guide', icon: BookOpen },
   ]
 
   return (

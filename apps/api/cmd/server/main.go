@@ -261,7 +261,7 @@ func main() {
 	streamHandler := handlers.NewStreamHandler(providerRegistry, authService)
 
 	// Admin handler for API users/keys management
-	adminHandler := handlers.NewAdminHandler(authService)
+	adminHandler := handlers.NewAdminHandler(authService, webAuthService)
 
 	// Web auth middleware for session-based auth
 	webAuthMiddleware := appMiddleware.NewWebAuthMiddleware(webAuthService)

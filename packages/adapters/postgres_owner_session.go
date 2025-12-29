@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 
 	"github.com/google/uuid"
 	"github.com/ingvar/aiaggregator/packages/domain"
@@ -51,7 +52,7 @@ func (r *PostgresOwnerSessionRepository) GetByTokenHash(ctx context.Context, tok
 		WHERE token_hash = $1`
 
 	var session domain.OwnerSession
-	var ipAddr *string
+	var ipAddr *netip.Addr
 	err := r.pool.QueryRow(ctx, query, tokenHash).Scan(
 		&session.ID, &session.OwnerID, &session.TokenHash,
 		&session.UserAgent, &ipAddr, &session.ExpiresAt, &session.CreatedAt)
@@ -64,7 +65,7 @@ func (r *PostgresOwnerSessionRepository) GetByTokenHash(ctx context.Context, tok
 	}
 
 	if ipAddr != nil {
-		session.IPAddress = net.ParseIP(*ipAddr)
+		session.IPAddress = net.IP(ipAddr.AsSlice())
 	}
 
 	return &session, nil
@@ -87,14 +88,14 @@ func (r *PostgresOwnerSessionRepository) GetByOwnerID(ctx context.Context, owner
 	var sessions []*domain.OwnerSession
 	for rows.Next() {
 		var session domain.OwnerSession
-		var ipAddr *string
+		var ipAddr *netip.Addr
 		if err := rows.Scan(
 			&session.ID, &session.OwnerID, &session.TokenHash,
 			&session.UserAgent, &ipAddr, &session.ExpiresAt, &session.CreatedAt); err != nil {
 			return nil, err
 		}
 		if ipAddr != nil {
-			session.IPAddress = net.ParseIP(*ipAddr)
+			session.IPAddress = net.IP(ipAddr.AsSlice())
 		}
 		sessions = append(sessions, &session)
 	}

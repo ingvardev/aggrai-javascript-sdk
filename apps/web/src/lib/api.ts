@@ -2,6 +2,21 @@ import { GraphQLClient } from 'graphql-request'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/graphql'
 
+// Create a function to get the client with current auth token
+export function getGraphQLClient(sessionToken?: string | null) {
+  const headers: Record<string, string> = {}
+
+  if (sessionToken) {
+    headers['Authorization'] = `Bearer ${sessionToken}`
+  } else {
+    // Fallback to API key for backward compatibility
+    headers['X-API-Key'] = 'dev-api-key-12345'
+  }
+
+  return new GraphQLClient(API_URL, { headers })
+}
+
+// Default client for non-auth requests
 export const graphqlClient = new GraphQLClient(API_URL, {
   headers: {
     'X-API-Key': 'dev-api-key-12345',
@@ -312,5 +327,188 @@ export const UPDATE_PRICING_MUTATION = `
 export const DELETE_PRICING_MUTATION = `
   mutation DeletePricing($id: ID!) {
     deletePricing(id: $id)
+  }
+`
+
+// ============================================
+// Authentication Types & Queries
+// ============================================
+
+export type OwnerRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
+export interface TenantOwner {
+  id: string
+  tenantId: string
+  email: string
+  name: string
+  role: OwnerRole
+  active: boolean
+  emailVerified: boolean
+  lastLoginAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AuthPayload {
+  success: boolean
+  sessionToken?: string
+  owner?: TenantOwner
+  tenant?: Tenant
+  error?: string
+}
+
+export interface Session {
+  id: string
+  userAgent?: string
+  ipAddress?: string
+  expiresAt: string
+  createdAt: string
+}
+
+export const LOGIN_MUTATION = `
+  mutation Login($input: LoginInput!) {
+    login(input: $input) {
+      success
+      sessionToken
+      owner {
+        id
+        tenantId
+        email
+        name
+        role
+        active
+        emailVerified
+        lastLoginAt
+        createdAt
+        updatedAt
+      }
+      tenant {
+        id
+        name
+        active
+      }
+      error
+    }
+  }
+`
+
+export const LOGOUT_MUTATION = `
+  mutation Logout {
+    logout
+  }
+`
+
+export const LOGOUT_ALL_MUTATION = `
+  mutation LogoutAll {
+    logoutAll
+  }
+`
+
+export const REGISTER_MUTATION = `
+  mutation Register($input: RegisterInput!) {
+    register(input: $input) {
+      success
+      sessionToken
+      owner {
+        id
+        tenantId
+        email
+        name
+        role
+        active
+      }
+      tenant {
+        id
+        name
+        active
+      }
+      error
+    }
+  }
+`
+
+export const CURRENT_OWNER_QUERY = `
+  query CurrentOwner {
+    currentOwner {
+      id
+      tenantId
+      email
+      name
+      role
+      active
+      emailVerified
+      lastLoginAt
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const MY_SESSIONS_QUERY = `
+  query MySessions {
+    mySessions {
+      id
+      userAgent
+      ipAddress
+      expiresAt
+      createdAt
+    }
+  }
+`
+
+export const TENANT_OWNERS_QUERY = `
+  query TenantOwners {
+    tenantOwners {
+      id
+      tenantId
+      email
+      name
+      role
+      active
+      emailVerified
+      lastLoginAt
+      createdAt
+      updatedAt
+    }
+  }
+`
+
+export const CREATE_OWNER_MUTATION = `
+  mutation CreateOwner($input: CreateOwnerInput!) {
+    createOwner(input: $input) {
+      id
+      tenantId
+      email
+      name
+      role
+      active
+      createdAt
+    }
+  }
+`
+
+export const UPDATE_OWNER_MUTATION = `
+  mutation UpdateOwner($id: ID!, $input: UpdateOwnerInput!) {
+    updateOwner(id: $id, input: $input) {
+      id
+      tenantId
+      email
+      name
+      role
+      active
+      updatedAt
+    }
+  }
+`
+
+export const DELETE_OWNER_MUTATION = `
+  mutation DeleteOwner($id: ID!) {
+    deleteOwner(id: $id)
+  }
+`
+
+export const CHANGE_PASSWORD_MUTATION = `
+  mutation ChangePassword($input: ChangePasswordInput!) {
+    changePassword(input: $input)
   }
 `

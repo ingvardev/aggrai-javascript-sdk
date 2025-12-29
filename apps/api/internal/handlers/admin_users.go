@@ -14,14 +14,38 @@ import (
 
 // AdminHandler handles admin API endpoints for managing API users and keys.
 type AdminHandler struct {
-	authService *usecases.AuthService
+	authService    *usecases.AuthService
+	webAuthService *usecases.WebAuthService
 }
 
 // NewAdminHandler creates a new admin handler.
-func NewAdminHandler(authService *usecases.AuthService) *AdminHandler {
+func NewAdminHandler(authService *usecases.AuthService, webAuthService *usecases.WebAuthService) *AdminHandler {
 	return &AdminHandler{
-		authService: authService,
+		authService:    authService,
+		webAuthService: webAuthService,
 	}
+}
+
+// getAuthContext tries to get auth context from API key or session token.
+// Returns AuthContext if authenticated, or nil if not.
+func (h *AdminHandler) getAuthContext(r *http.Request) *domain.AuthContext {
+	// First try API key auth
+	authCtx := middleware.AuthContextFromContext(r.Context())
+	if authCtx != nil {
+		return authCtx
+	}
+
+	// Then try session auth (web dashboard) - owners have admin scope
+	webCtx := middleware.WebAuthContextFromContext(r.Context())
+	if webCtx != nil {
+		// Convert WebAuthContext to AuthContext with admin scope
+		return &domain.AuthContext{
+			TenantID: webCtx.TenantID,
+			Scopes:   []string{string(domain.ScopeAdmin), string(domain.ScopeRead), string(domain.ScopeWrite)},
+		}
+	}
+
+	return nil
 }
 
 // --- Request/Response types ---
@@ -81,7 +105,7 @@ type ErrorResponse struct {
 
 // CreateUser handles POST /api/admin/users
 func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	authCtx := middleware.AuthContextFromContext(r.Context())
+	authCtx := h.getAuthContext(r)
 	if authCtx == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return
@@ -114,7 +138,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // ListUsers handles GET /api/admin/users
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	authCtx := middleware.AuthContextFromContext(r.Context())
+	authCtx := h.getAuthContext(r)
 	if authCtx == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return
@@ -140,7 +164,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 // CreateKey handles POST /api/admin/api-keys
 func (h *AdminHandler) CreateKey(w http.ResponseWriter, r *http.Request) {
-	authCtx := middleware.AuthContextFromContext(r.Context())
+	authCtx := h.getAuthContext(r)
 	if authCtx == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return
@@ -187,7 +211,7 @@ func (h *AdminHandler) CreateKey(w http.ResponseWriter, r *http.Request) {
 
 // ListKeys handles GET /api/admin/users/{user_id}/api-keys
 func (h *AdminHandler) ListKeys(w http.ResponseWriter, r *http.Request) {
-	authCtx := middleware.AuthContextFromContext(r.Context())
+	authCtx := h.getAuthContext(r)
 	if authCtx == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return
@@ -224,7 +248,7 @@ func (h *AdminHandler) ListKeys(w http.ResponseWriter, r *http.Request) {
 
 // RevokeKey handles DELETE /api/admin/api-keys/{id}
 func (h *AdminHandler) RevokeKey(w http.ResponseWriter, r *http.Request) {
-	authCtx := middleware.AuthContextFromContext(r.Context())
+	authCtx := h.getAuthContext(r)
 	if authCtx == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return

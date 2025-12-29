@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,14 @@ import (
 // parseIP safely parses an IP address string
 func parseIP(s string) net.IP {
 	return net.ParseIP(s)
+}
+
+// netipAddrToNetIP converts netip.Addr to net.IP
+func netipAddrToNetIP(addr netip.Addr) net.IP {
+	if !addr.IsValid() {
+		return nil
+	}
+	return net.IP(addr.AsSlice())
 }
 
 // Ensure PostgresTenantOwnerRepository implements the interface.
@@ -52,7 +61,7 @@ func (r *PostgresTenantOwnerRepository) GetByID(ctx context.Context, id uuid.UUI
 		FROM tenant_owners WHERE id = $1`
 
 	var owner domain.TenantOwner
-	var lastLoginIP *string
+	var lastLoginIP *netip.Addr
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&owner.ID, &owner.TenantID, &owner.Email, &owner.PasswordHash,
 		&owner.Name, &owner.Role, &owner.Active, &owner.EmailVerified,
@@ -67,7 +76,7 @@ func (r *PostgresTenantOwnerRepository) GetByID(ctx context.Context, id uuid.UUI
 	}
 
 	if lastLoginIP != nil {
-		owner.LastLoginIP = parseIP(*lastLoginIP)
+		owner.LastLoginIP = netipAddrToNetIP(*lastLoginIP)
 	}
 
 	return &owner, nil
@@ -81,7 +90,7 @@ func (r *PostgresTenantOwnerRepository) GetByEmail(ctx context.Context, email st
 		FROM tenant_owners WHERE email = $1`
 
 	var owner domain.TenantOwner
-	var lastLoginIP *string
+	var lastLoginIP *netip.Addr
 	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&owner.ID, &owner.TenantID, &owner.Email, &owner.PasswordHash,
 		&owner.Name, &owner.Role, &owner.Active, &owner.EmailVerified,
@@ -96,7 +105,7 @@ func (r *PostgresTenantOwnerRepository) GetByEmail(ctx context.Context, email st
 	}
 
 	if lastLoginIP != nil {
-		owner.LastLoginIP = parseIP(*lastLoginIP)
+		owner.LastLoginIP = netipAddrToNetIP(*lastLoginIP)
 	}
 
 	return &owner, nil
@@ -120,7 +129,7 @@ func (r *PostgresTenantOwnerRepository) GetByTenantID(ctx context.Context, tenan
 	var owners []*domain.TenantOwner
 	for rows.Next() {
 		var owner domain.TenantOwner
-		var lastLoginIP *string
+		var lastLoginIP *netip.Addr
 		if err := rows.Scan(
 			&owner.ID, &owner.TenantID, &owner.Email, &owner.PasswordHash,
 			&owner.Name, &owner.Role, &owner.Active, &owner.EmailVerified,
@@ -129,7 +138,7 @@ func (r *PostgresTenantOwnerRepository) GetByTenantID(ctx context.Context, tenan
 			return nil, err
 		}
 		if lastLoginIP != nil {
-			owner.LastLoginIP = parseIP(*lastLoginIP)
+			owner.LastLoginIP = netipAddrToNetIP(*lastLoginIP)
 		}
 		owners = append(owners, &owner)
 	}
