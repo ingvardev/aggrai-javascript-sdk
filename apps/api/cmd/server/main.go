@@ -260,6 +260,9 @@ func main() {
 	// Streaming handler
 	streamHandler := handlers.NewStreamHandler(providerRegistry, authService)
 
+	// Completions handler (synchronous, non-streaming)
+	completionsHandler := handlers.NewCompletionsHandler(providerRegistry, authService)
+
 	// Admin handler for API users/keys management
 	adminHandler := handlers.NewAdminHandler(authService, webAuthService)
 
@@ -273,6 +276,9 @@ func main() {
 		r.Handle("/graphql", graphServer)
 		r.Handle("/stream", streamHandler)
 
+		// Completions API (synchronous)
+		r.Handle("/api/chat/completions", completionsHandler)
+
 		// Admin API routes (require admin scope)
 		r.Route("/api/admin", func(r chi.Router) {
 			// API Users
@@ -283,6 +289,9 @@ func main() {
 			r.Post("/api-keys", adminHandler.CreateKey)
 			r.Delete("/api-keys/{id}", adminHandler.RevokeKey)
 			r.Get("/users/{user_id}/api-keys", adminHandler.ListKeys)
+
+			// Activity
+			r.Get("/users/{user_id}/activity", adminHandler.GetUserActivity)
 		})
 	})
 

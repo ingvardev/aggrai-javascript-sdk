@@ -395,6 +395,28 @@ func (s *AuthService) ListAPIKeys(ctx context.Context, authCtx *domain.AuthConte
 	return s.apiKeyRepo.GetByUserID(ctx, userID)
 }
 
+// GetUserActivity retrieves audit log entries for an API user.
+func (s *AuthService) GetUserActivity(ctx context.Context, authCtx *domain.AuthContext, userID uuid.UUID, limit, offset int) ([]*domain.AuditLogEntry, error) {
+	if err := authCtx.RequireScope(domain.ScopeAdmin); err != nil {
+		return nil, err
+	}
+
+	// Verify user belongs to this tenant
+	user, err := s.apiUserRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.TenantID != authCtx.TenantID {
+		return nil, domain.ErrAPIUserNotFound
+	}
+
+	if s.auditRepo == nil {
+		return []*domain.AuditLogEntry{}, nil
+	}
+
+	return s.auditRepo.GetByAPIUserID(ctx, userID, limit, offset)
+}
+
 // logAuthEvent logs an audit event asynchronously.
 func (s *AuthService) logAuthEvent(ctx context.Context, tenantID *uuid.UUID, userID, keyID *uuid.UUID, action domain.AuditAction, req *AuthenticateRequest, details map[string]interface{}) {
 	if s.auditRepo == nil {
@@ -430,4 +452,45 @@ func safePrefix(key string) string {
 		return "***"
 	}
 	return key[:8] + "..."
+}
+
+// RequestLogParams contains parameters for logging API requests.
+type RequestLogParams struct {
+	TenantID  uuid.UUID
+	APIUserID *uuid.UUID
+	APIKeyID  *uuid.UUID
+	Action    domain.AuditAction
+	Provider  string
+	Model     string
+	TokensIn  int
+	TokensOut int
+	Cost      float64
+	ClientIP  string
+	UserAgent string
+}
+
+// LogRequestActivity logs an API request to the audit log.
+func (s *AuthService) LogRequestActivity(ctx context.Context, params *RequestLogParams) {
+	if s.auditRepo == nil {
+		return
+	}
+
+	go func() {
+		entry := domain.NewAuditLogEntry(params.TenantID, params.Action)
+		entry.APIUserID = params.APIUserID
+		entry.APIKeyID = params.APIKeyID
+		entry.Details = map[string]interface{}{
+			"provider":   params.Provider,
+			"model":      params.Model,
+			"tokens_in":  params.TokensIn,
+			"tokens_out": params.TokensOut,
+			"cost":       params.Cost,
+		}
+		entry.IPAddress = net.ParseIP(params.ClientIP)
+		entry.UserAgent = params.UserAgent
+
+		if err := s.auditRepo.Create(context.Background(), entry); err != nil {
+			log.Warn().Err(err).Str("action", string(params.Action)).Msg("Failed to log request activity")
+		}
+	}()
 }

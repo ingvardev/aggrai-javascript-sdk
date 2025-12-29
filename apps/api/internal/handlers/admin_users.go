@@ -95,6 +95,16 @@ type CreateKeyResponse struct {
 	Key string `json:"key"` // Raw key - ONLY SHOWN ONCE
 }
 
+// ActivityEntry represents an audit log entry in API response.
+type ActivityEntry struct {
+	ID        string                 `json:"id"`
+	Action    string                 `json:"action"`
+	Details   map[string]interface{} `json:"details,omitempty"`
+	IPAddress string                 `json:"ip_address,omitempty"`
+	UserAgent string                 `json:"user_agent,omitempty"`
+	CreatedAt string                 `json:"created_at"`
+}
+
 // ErrorResponse is the standard error response.
 type ErrorResponse struct {
 	Error   string `json:"error"`
@@ -277,6 +287,47 @@ func (h *AdminHandler) RevokeKey(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetUserActivity handles GET /api/admin/users/{user_id}/activity
+func (h *AdminHandler) GetUserActivity(w http.ResponseWriter, r *http.Request) {
+	authCtx := h.getAuthContext(r)
+	if authCtx == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
+
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "Invalid user_id format")
+		return
+	}
+
+	// Default limit and offset
+	limit := 50
+	offset := 0
+
+	entries, err := h.authService.GetUserActivity(r.Context(), authCtx, userID, limit, offset)
+	if err != nil {
+		if err == domain.ErrInsufficientScope {
+			writeError(w, http.StatusForbidden, "forbidden", "Admin scope required")
+			return
+		}
+		if err == domain.ErrAPIUserNotFound {
+			writeError(w, http.StatusNotFound, "not_found", "User not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to get activity")
+		return
+	}
+
+	resp := make([]ActivityEntry, len(entries))
+	for i, e := range entries {
+		resp[i] = toActivityEntry(e)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // --- Helper functions ---
 
 func toUserResponse(u *domain.APIUser) UserResponse {
@@ -317,6 +368,20 @@ func toKeyResponse(k *domain.APIKey) KeyResponse {
 	}
 
 	return resp
+}
+
+func toActivityEntry(e *domain.AuditLogEntry) ActivityEntry {
+	entry := ActivityEntry{
+		ID:        e.ID.String(),
+		Action:    string(e.Action),
+		Details:   e.Details,
+		UserAgent: e.UserAgent,
+		CreatedAt: e.CreatedAt.Format(time.RFC3339),
+	}
+	if e.IPAddress != nil {
+		entry.IPAddress = e.IPAddress.String()
+	}
+	return entry
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

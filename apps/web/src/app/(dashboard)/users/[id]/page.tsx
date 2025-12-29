@@ -8,7 +8,8 @@ import {
   useAPIUser,
   useAPIKeys,
   useCreateAPIKey,
-  useRevokeAPIKey
+  useRevokeAPIKey,
+  useUserActivity
 } from '@/lib/hooks'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -226,21 +227,7 @@ export default function APIUserDetailPage() {
         </TabsContent>
 
         <TabsContent value="activity">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('users.activity')}</CardTitle>
-              <CardDescription>{t('users.activityDescription')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <Activity className="h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">{t('users.noActivity')}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {t('users.noActivityDescription')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <ActivityTab userId={userId} />
         </TabsContent>
       </Tabs>
 
@@ -511,5 +498,147 @@ function UserDetailSkeleton() {
       </div>
       <Skeleton className="h-96" />
     </div>
+  )
+}
+
+function ActivityTab({ userId }: { userId: string }) {
+  const { t } = useTranslation()
+  const { data: activities, isLoading, error } = useUserActivity(userId)
+
+  const formatAction = (action: string) => {
+    const actionLabels: Record<string, string> = {
+      'auth_success': t('users.activityAuthSuccess', 'Authentication successful'),
+      'auth_failed': t('users.activityAuthFailed', 'Authentication failed'),
+      'key_created': t('users.activityKeyCreated', 'API key created'),
+      'key_revoked': t('users.activityKeyRevoked', 'API key revoked'),
+      'request': t('users.activityRequest', 'API request'),
+      'completion': t('users.activityCompletion', 'Chat completion'),
+      'streaming': t('users.activityStreaming', 'Streaming request'),
+    }
+    return actionLabels[action] || action.replace(/_/g, ' ')
+  }
+
+  const formatDetails = (action: string, details?: Record<string, unknown>) => {
+    if (!details) return null
+
+    // For completion/streaming requests, show provider, model, tokens
+    if (action === 'completion' || action === 'streaming') {
+      const parts = []
+      if (details.provider) parts.push(`${details.provider}`)
+      if (details.model) parts.push(`${details.model}`)
+      if (details.tokens_in || details.tokens_out) {
+        parts.push(`${details.tokens_in || 0}→${details.tokens_out || 0} tokens`)
+      }
+      if (details.cost && Number(details.cost) > 0) {
+        parts.push(`$${Number(details.cost).toFixed(4)}`)
+      }
+      return parts.join(' • ')
+    }
+
+    // For other actions, show first 2 key-values
+    return Object.entries(details).slice(0, 2).map(([k, v]) =>
+      `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`
+    ).join(', ')
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.activity')}</CardTitle>
+          <CardDescription>{t('users.activityDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.activity')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <AlertTriangle className="h-12 w-12 text-destructive" />
+            <p className="mt-4 text-destructive">{t('users.activityError', 'Failed to load activity')}</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!activities || activities.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.activity')}</CardTitle>
+          <CardDescription>{t('users.activityDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <Activity className="h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold">{t('users.noActivity')}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('users.noActivityDescription')}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('users.activity')}</CardTitle>
+        <CardDescription>{t('users.activityDescription')}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('users.activityAction', 'Action')}</TableHead>
+              <TableHead>{t('users.activityDetails', 'Details')}</TableHead>
+              <TableHead>{t('users.activityIP', 'IP Address')}</TableHead>
+              <TableHead>{t('users.activityDate', 'Date')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {activities.map((activity) => (
+              <TableRow key={activity.id}>
+                <TableCell className="font-medium">
+                  {formatAction(activity.action)}
+                </TableCell>
+                <TableCell className="max-w-xs text-muted-foreground">
+                  {activity.details ? (
+                    <span title={JSON.stringify(activity.details)} className="text-sm">
+                      {formatDetails(activity.action, activity.details)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/50">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <code className="rounded bg-muted px-2 py-1 text-xs">
+                    {activity.ip_address || '—'}
+                  </code>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {formatDate(activity.created_at)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   )
 }

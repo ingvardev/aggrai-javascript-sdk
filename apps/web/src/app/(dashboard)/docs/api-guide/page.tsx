@@ -92,6 +92,7 @@ function TableOfContents() {
   const items = [
     { id: 'quickstart', label: 'Быстрый старт', icon: Zap },
     { id: 'authentication', label: 'Аутентификация', icon: Key },
+    { id: 'completions', label: 'Chat Completions', icon: MessageSquare },
     { id: 'streaming', label: 'SSE Streaming', icon: Sparkles },
     { id: 'graphql', label: 'GraphQL API', icon: Code2 },
     { id: 'providers', label: 'Провайдеры', icon: Globe },
@@ -143,14 +144,32 @@ export default function APIGuidePage() {
               Получите ответ от AI за 30 секунд. Замените <code>YOUR_API_KEY</code> на ваш ключ.
             </p>
 
-            <CodeBlock
-              language="bash"
-              title="Первый запрос"
-              code={`curl -N "http://localhost:8080/stream?provider=openai&model=gpt-4o-mini" \\
+            <Tabs defaultValue="sync" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="sync">Синхронный ответ</TabsTrigger>
+                <TabsTrigger value="stream">SSE Streaming</TabsTrigger>
+              </TabsList>
+              <TabsContent value="sync" className="mt-4">
+                <CodeBlock
+                  language="bash"
+                  title="Chat Completions (полный ответ)"
+                  code={`curl -X POST http://localhost:8080/api/chat/completions \\
   -H "X-API-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"prompt": "Привет! Расскажи о себе."}'`}
-            />
+  -d '{"prompt": "Привет! Расскажи о себе.", "provider": "openai", "model": "gpt-4o-mini"}'`}
+                />
+              </TabsContent>
+              <TabsContent value="stream" className="mt-4">
+                <CodeBlock
+                  language="bash"
+                  title="SSE Streaming (real-time)"
+                  code={`curl -N http://localhost:8080/stream \\
+  -H "X-API-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"prompt": "Привет! Расскажи о себе.", "provider": "openai", "model": "gpt-4o-mini"}'`}
+                />
+              </TabsContent>
+            </Tabs>
 
             <Card className="border-green-500/30 bg-green-500/5">
               <CardContent className="flex items-start gap-3 pt-4">
@@ -224,6 +243,158 @@ Host: localhost:8080`}
                 </TabsContent>
               </Tabs>
             </div>
+          </section>
+
+          {/* Chat Completions */}
+          <section id="completions" className="scroll-mt-16 space-y-6">
+            <h2 className="text-2xl font-bold">💬 Chat Completions</h2>
+            <p className="text-muted-foreground">
+              Синхронный endpoint для получения полного ответа от AI без стриминга.
+            </p>
+
+            <Card>
+              <CardHeader className="bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <MethodBadge method="POST" />
+                  <code className="text-sm font-medium">/api/chat/completions</code>
+                </div>
+                <CardDescription>Synchronous completion endpoint</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-6">
+                <div className="space-y-4">
+                  <h4 className="font-medium">Request Body</h4>
+                  <div className="overflow-hidden rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium">Параметр</th>
+                          <th className="px-4 py-2 text-left font-medium">Тип</th>
+                          <th className="px-4 py-2 text-left font-medium">Описание</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t">
+                          <td className="px-4 py-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">prompt</code>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">string</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            Простой текстовый промпт
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-4 py-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">messages</code>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">array</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            Массив сообщений для chat
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-4 py-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">provider</code>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">string</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            openai, claude, ollama
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-4 py-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">model</code>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">string</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            gpt-4o-mini, claude-3-5-sonnet и др.
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-4 py-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">maxTokens</code>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">number</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            Максимум токенов (по умолчанию 2048)
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-4 py-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">tools</code>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">array</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            Function calling tools (опционально)
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-medium">Простой запрос с prompt</h4>
+                  <CodeBlock
+                    language="bash"
+                    code={`curl -X POST http://localhost:8080/api/chat/completions \\
+  -H "X-API-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "prompt": "Объясни что такое REST API",
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  }'`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-medium">Chat с messages</h4>
+                  <CodeBlock
+                    language="bash"
+                    code={`curl -X POST http://localhost:8080/api/chat/completions \\
+  -H "X-API-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [
+      {"role": "system", "content": "Ты полезный ассистент"},
+      {"role": "user", "content": "Привет! Как дела?"}
+    ],
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  }'`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-medium">Response</h4>
+                  <CodeBlock
+                    language="json"
+                    code={`{
+  "content": "Привет! У меня всё отлично, спасибо! Чем могу помочь?",
+  "finishReason": "stop",
+  "tokensIn": 25,
+  "tokensOut": 18,
+  "cost": 0.0000129,
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}`}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardContent className="flex items-start gap-3 pt-4">
+                <MessageSquare className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="font-medium">Когда использовать</p>
+                  <p className="text-sm text-muted-foreground">
+                    Используйте <code>/api/chat/completions</code> когда вам нужен полный ответ сразу.
+                    Для real-time ответов используйте <code>/stream</code>.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </section>
 
           {/* SSE Streaming */}
@@ -598,24 +769,78 @@ data: {"usage": {"prompt_tokens": 15, "completion_tokens": 42}}`}
               </TabsList>
 
               <TabsContent value="javascript" className="mt-4 space-y-4">
-                <h4 className="font-medium">SSE Streaming с fetch</h4>
+                <h4 className="font-medium">Chat Completions (синхронный)</h4>
                 <CodeBlock
                   language="javascript"
                   code={`const API_KEY = 'agg_your_api_key_here';
 const API_BASE = 'http://localhost:8080';
 
-async function streamCompletion(prompt) {
-  const response = await fetch(
-    \`\${API_BASE}/stream?provider=openai&model=gpt-4o-mini\`,
-    {
-      method: 'POST',
-      headers: {
-        'X-API-Key': API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-    }
-  );
+// Простой запрос с prompt
+async function chatCompletion(prompt) {
+  const response = await fetch(\`\${API_BASE}/api/chat/completions\`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    }),
+  });
+
+  const data = await response.json();
+  console.log(data.content);
+  console.log(\`Токены: \${data.tokensIn} → \${data.tokensOut}, Стоимость: $\${data.cost}\`);
+  return data;
+}
+
+// Chat с историей сообщений
+async function chatWithMessages(messages) {
+  const response = await fetch(\`\${API_BASE}/api/chat/completions\`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messages,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    }),
+  });
+
+  return await response.json();
+}
+
+// Пример использования
+chatCompletion('Объясни что такое REST API');
+
+chatWithMessages([
+  { role: 'system', content: 'Ты полезный ассистент' },
+  { role: 'user', content: 'Привет!' },
+  { role: 'assistant', content: 'Привет! Чем могу помочь?' },
+  { role: 'user', content: 'Напиши функцию сортировки' },
+]);`}
+                />
+
+                <h4 className="font-medium">SSE Streaming с fetch</h4>
+                <CodeBlock
+                  language="javascript"
+                  code={`async function streamCompletion(prompt) {
+  const response = await fetch(\`\${API_BASE}/stream\`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    }),
+  });
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -630,15 +855,17 @@ async function streamCompletion(prompt) {
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const data = JSON.parse(line.slice(6));
-        if (data.content) {
+        if (data.type === 'chunk') {
           process.stdout.write(data.content);
+        } else if (data.type === 'done') {
+          console.log(\`\\n\\nТокены: \${data.tokensIn} → \${data.tokensOut}\`);
         }
       }
     }
   }
 }
 
-streamCompletion('Объясни, что такое API');`}
+streamCompletion('Напиши стихотворение о программировании');`}
                 />
 
                 <h4 className="font-medium">GraphQL запрос</h4>
@@ -671,23 +898,31 @@ streamCompletion('Объясни, что такое API');`}
               </TabsContent>
 
               <TabsContent value="python" className="mt-4 space-y-4">
+                <h4 className="font-medium">Chat Completions (синхронный)</h4>
+                <CodeBlock
+                  language="python"
+                  code={'import requests\n\nAPI_KEY = \'agg_your_api_key_here\'\nAPI_BASE = \'http://localhost:8080\'\n\ndef chat_completion(prompt: str) -> dict:\n    """Синхронный запрос - получаем полный ответ сразу"""\n    response = requests.post(\n        f\'{API_BASE}/api/chat/completions\',\n        headers={\n            \'X-API-Key\': API_KEY,\n            \'Content-Type\': \'application/json\',\n        },\n        json={\n            \'prompt\': prompt,\n            \'provider\': \'openai\',\n            \'model\': \'gpt-4o-mini\',\n        }\n    )\n    data = response.json()\n    print(data[\'content\'])\n    print(f"Токены: {data[\'tokensIn\']} → {data[\'tokensOut\']}, Стоимость: ${data[\'cost\']}")\n    return data\n\ndef chat_with_messages(messages: list) -> dict:\n    """Chat с историей сообщений"""\n    response = requests.post(\n        f\'{API_BASE}/api/chat/completions\',\n        headers={\n            \'X-API-Key\': API_KEY,\n            \'Content-Type\': \'application/json\',\n        },\n        json={\n            \'messages\': messages,\n            \'provider\': \'openai\',\n            \'model\': \'gpt-4o-mini\',\n        }\n    )\n    return response.json()\n\n# Примеры использования\nchat_completion(\'Объясни что такое REST API\')\n\nchat_with_messages([\n    {\'role\': \'system\', \'content\': \'Ты полезный ассистент\'},\n    {\'role\': \'user\', \'content\': \'Привет!\'},\n    {\'role\': \'assistant\', \'content\': \'Привет! Чем могу помочь?\'},\n    {\'role\': \'user\', \'content\': \'Напиши функцию сортировки\'},\n])'}
+                />
+
                 <h4 className="font-medium">SSE Streaming</h4>
                 <CodeBlock
                   language="python"
                   code={`import requests
 import json
 
-API_KEY = 'agg_your_api_key_here'
-API_BASE = 'http://localhost:8080'
-
 def stream_completion(prompt: str):
+    """Streaming - получаем ответ по частям в реальном времени"""
     response = requests.post(
-        f'{API_BASE}/stream?provider=openai&model=gpt-4o-mini',
+        f'{API_BASE}/stream',
         headers={
             'X-API-Key': API_KEY,
             'Content-Type': 'application/json',
         },
-        json={'prompt': prompt},
+        json={
+            'prompt': prompt,
+            'provider': 'openai',
+            'model': 'gpt-4o-mini',
+        },
         stream=True
     )
 
@@ -696,8 +931,10 @@ def stream_completion(prompt: str):
             line = line.decode('utf-8')
             if line.startswith('data: '):
                 data = json.loads(line[6:])
-                if 'content' in data:
+                if data.get('type') == 'chunk':
                     print(data['content'], end='', flush=True)
+                elif data.get('type') == 'done':
+                    print(f"\\n\\nТокены: {data['tokensIn']} → {data['tokensOut']}")
 
 stream_completion('Напиши haiku о Python')`}
                 />
@@ -730,18 +967,16 @@ stream_completion('Напиши haiku о Python')`}
               </TabsContent>
 
               <TabsContent value="go" className="mt-4 space-y-4">
-                <h4 className="font-medium">SSE Streaming</h4>
+                <h4 className="font-medium">Chat Completions (синхронный)</h4>
                 <CodeBlock
                   language="go"
                   code={`package main
 
 import (
-    "bufio"
     "bytes"
     "encoding/json"
     "fmt"
     "net/http"
-    "strings"
 )
 
 const (
@@ -749,12 +984,75 @@ const (
     apiBase = "http://localhost:8080"
 )
 
-func streamCompletion(prompt string) error {
-    body, _ := json.Marshal(map[string]string{"prompt": prompt})
+type CompletionRequest struct {
+    Prompt   string \`json:"prompt,omitempty"\`
+    Messages []Message \`json:"messages,omitempty"\`
+    Provider string \`json:"provider"\`
+    Model    string \`json:"model"\`
+}
 
-    req, _ := http.NewRequest("POST",
-        apiBase+"/stream?provider=openai&model=gpt-4o-mini",
-        bytes.NewBuffer(body))
+type Message struct {
+    Role    string \`json:"role"\`
+    Content string \`json:"content"\`
+}
+
+type CompletionResponse struct {
+    Content      string  \`json:"content"\`
+    FinishReason string  \`json:"finishReason"\`
+    TokensIn     int     \`json:"tokensIn"\`
+    TokensOut    int     \`json:"tokensOut"\`
+    Cost         float64 \`json:"cost"\`
+    Provider     string  \`json:"provider"\`
+    Model        string  \`json:"model"\`
+}
+
+func chatCompletion(prompt string) (*CompletionResponse, error) {
+    payload := CompletionRequest{
+        Prompt:   prompt,
+        Provider: "openai",
+        Model:    "gpt-4o-mini",
+    }
+
+    body, _ := json.Marshal(payload)
+    req, _ := http.NewRequest("POST", apiBase+"/api/chat/completions", bytes.NewBuffer(body))
+    req.Header.Set("X-API-Key", apiKey)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+
+    var result CompletionResponse
+    json.NewDecoder(resp.Body).Decode(&result)
+    return &result, nil
+}
+
+func main() {
+    resp, _ := chatCompletion("Объясни что такое REST API")
+    fmt.Println(resp.Content)
+    fmt.Printf("Токены: %d → %d, Стоимость: $%.6f\\n", resp.TokensIn, resp.TokensOut, resp.Cost)
+}`}
+                />
+
+                <h4 className="font-medium">SSE Streaming</h4>
+                <CodeBlock
+                  language="go"
+                  code={`import (
+    "bufio"
+    "strings"
+)
+
+func streamCompletion(prompt string) error {
+    payload := map[string]interface{}{
+        "prompt":   prompt,
+        "provider": "openai",
+        "model":    "gpt-4o-mini",
+    }
+    body, _ := json.Marshal(payload)
+
+    req, _ := http.NewRequest("POST", apiBase+"/stream", bytes.NewBuffer(body))
     req.Header.Set("X-API-Key", apiKey)
     req.Header.Set("Content-Type", "application/json")
 
@@ -770,16 +1068,14 @@ func streamCompletion(prompt string) error {
         if strings.HasPrefix(line, "data: ") {
             var data map[string]interface{}
             json.Unmarshal([]byte(line[6:]), &data)
-            if content, ok := data["content"].(string); ok {
-                fmt.Print(content)
+            if data["type"] == "chunk" {
+                fmt.Print(data["content"])
+            } else if data["type"] == "done" {
+                fmt.Printf("\\n\\nТокены: %.0f → %.0f\\n", data["tokensIn"], data["tokensOut"])
             }
         }
     }
     return nil
-}
-
-func main() {
-    streamCompletion("Напиши функцию сортировки")
 }`}
                 />
               </TabsContent>

@@ -70,6 +70,190 @@ curl -X POST http://localhost:8080/graphql \
   -d '{"query":"mutation { createJob(input: { type: TEXT, input: \"Hello AI!\" }) { id status } }"}'
 ```
 
+## 💻 Примеры кода
+
+### Chat Completions (синхронный ответ)
+
+```bash
+curl -X POST http://localhost:8080/api/chat/completions \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Объясни что такое REST API",
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  }'
+```
+
+**Ответ:**
+```json
+{
+  "content": "REST API — это архитектурный стиль...",
+  "finishReason": "stop",
+  "tokensIn": 14,
+  "tokensOut": 156,
+  "cost": 0.0000552,
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}
+```
+
+### Chat с историей сообщений
+
+```bash
+curl -X POST http://localhost:8080/api/chat/completions \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "system", "content": "Ты полезный ассистент"},
+      {"role": "user", "content": "Привет!"},
+      {"role": "assistant", "content": "Привет! Чем могу помочь?"},
+      {"role": "user", "content": "Напиши функцию сортировки на Python"}
+    ],
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  }'
+```
+
+### SSE Streaming (real-time ответ)
+
+```bash
+curl -N http://localhost:8080/stream \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Напиши стихотворение о программировании",
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  }'
+```
+
+### JavaScript/TypeScript
+
+```typescript
+// Chat Completions
+const response = await fetch('http://localhost:8080/api/chat/completions', {
+  method: 'POST',
+  headers: {
+    'X-API-Key': 'YOUR_API_KEY',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    prompt: 'Привет! Как дела?',
+    provider: 'openai',
+    model: 'gpt-4o-mini',
+  }),
+});
+
+const data = await response.json();
+console.log(data.content);
+```
+
+```typescript
+// SSE Streaming
+const response = await fetch('http://localhost:8080/stream', {
+  method: 'POST',
+  headers: {
+    'X-API-Key': 'YOUR_API_KEY',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ prompt: 'Hello!' }),
+});
+
+const reader = response.body?.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader!.read();
+  if (done) break;
+
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
+  for (const line of lines) {
+    const data = JSON.parse(line.slice(6));
+    if (data.type === 'chunk') {
+      process.stdout.write(data.content);
+    }
+  }
+}
+```
+
+### Python
+
+```python
+import requests
+
+# Chat Completions
+response = requests.post(
+    'http://localhost:8080/api/chat/completions',
+    headers={
+        'X-API-Key': 'YOUR_API_KEY',
+        'Content-Type': 'application/json',
+    },
+    json={
+        'prompt': 'Привет! Как дела?',
+        'provider': 'openai',
+        'model': 'gpt-4o-mini',
+    }
+)
+
+data = response.json()
+print(data['content'])
+```
+
+```python
+# SSE Streaming
+import sseclient
+
+response = requests.post(
+    'http://localhost:8080/stream',
+    headers={'X-API-Key': 'YOUR_API_KEY', 'Content-Type': 'application/json'},
+    json={'prompt': 'Hello!'},
+    stream=True
+)
+
+client = sseclient.SSEClient(response)
+for event in client.events():
+    data = json.loads(event.data)
+    if data.get('type') == 'chunk':
+        print(data['content'], end='', flush=True)
+```
+
+### Go
+
+```go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "net/http"
+)
+
+func main() {
+    payload := map[string]interface{}{
+        "prompt":   "Привет! Как дела?",
+        "provider": "openai",
+        "model":    "gpt-4o-mini",
+    }
+
+    body, _ := json.Marshal(payload)
+    req, _ := http.NewRequest("POST", "http://localhost:8080/api/chat/completions", bytes.NewBuffer(body))
+    req.Header.Set("X-API-Key", "YOUR_API_KEY")
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, _ := http.DefaultClient.Do(req)
+    defer resp.Body.Close()
+
+    var result map[string]interface{}
+    json.NewDecoder(resp.Body).Decode(&result)
+    fmt.Println(result["content"])
+}
+```
+
 ## 📁 Структура проекта
 
 ```

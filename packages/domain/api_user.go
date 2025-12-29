@@ -241,6 +241,10 @@ const (
 	AuditActionAuthSuccess   AuditAction = "auth_success"
 	AuditActionAuthFailed    AuditAction = "auth_failed"
 	AuditActionScopeViolation AuditAction = "scope_violation"
+	// Request activity actions
+	AuditActionCompletion    AuditAction = "completion"
+	AuditActionStreaming     AuditAction = "streaming"
+	AuditActionRequest       AuditAction = "request"
 )
 
 // AuditLogEntry represents an entry in the audit log.

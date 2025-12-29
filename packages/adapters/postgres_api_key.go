@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 
 	"github.com/google/uuid"
 	"github.com/ingvar/aiaggregator/packages/domain"
@@ -46,7 +47,7 @@ func (r *PostgresAPIKeyRepository) GetByHash(ctx context.Context, keyHash string
 		WHERE key_hash = $1`
 
 	var key domain.APIKey
-	var lastUsedIP *string
+	var lastUsedIP netip.Addr
 	err := r.pool.QueryRow(ctx, query, keyHash).Scan(
 		&key.ID, &key.APIUserID, &key.KeyHash, &key.KeyPrefix,
 		&key.Name, &key.Scopes, &key.Active, &key.ExpiresAt,
@@ -60,8 +61,8 @@ func (r *PostgresAPIKeyRepository) GetByHash(ctx context.Context, keyHash string
 		return nil, err
 	}
 
-	if lastUsedIP != nil {
-		key.LastUsedIP = net.ParseIP(*lastUsedIP)
+	if lastUsedIP.IsValid() {
+		key.LastUsedIP = net.ParseIP(lastUsedIP.String())
 	}
 
 	return &key, nil
@@ -76,7 +77,7 @@ func (r *PostgresAPIKeyRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 		WHERE id = $1`
 
 	var key domain.APIKey
-	var lastUsedIP *string
+	var lastUsedIP netip.Addr
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&key.ID, &key.APIUserID, &key.KeyHash, &key.KeyPrefix,
 		&key.Name, &key.Scopes, &key.Active, &key.ExpiresAt,
@@ -90,8 +91,8 @@ func (r *PostgresAPIKeyRepository) GetByID(ctx context.Context, id uuid.UUID) (*
 		return nil, err
 	}
 
-	if lastUsedIP != nil {
-		key.LastUsedIP = net.ParseIP(*lastUsedIP)
+	if lastUsedIP.IsValid() {
+		key.LastUsedIP = net.ParseIP(lastUsedIP.String())
 	}
 
 	return &key, nil
@@ -115,7 +116,7 @@ func (r *PostgresAPIKeyRepository) GetByUserID(ctx context.Context, userID uuid.
 	var keys []*domain.APIKey
 	for rows.Next() {
 		var key domain.APIKey
-		var lastUsedIP *string
+		var lastUsedIP netip.Addr
 		if err := rows.Scan(
 			&key.ID, &key.APIUserID, &key.KeyHash, &key.KeyPrefix,
 			&key.Name, &key.Scopes, &key.Active, &key.ExpiresAt,
@@ -123,8 +124,8 @@ func (r *PostgresAPIKeyRepository) GetByUserID(ctx context.Context, userID uuid.
 			&key.RevokedAt, &key.RevokedBy); err != nil {
 			return nil, err
 		}
-		if lastUsedIP != nil {
-			key.LastUsedIP = net.ParseIP(*lastUsedIP)
+		if lastUsedIP.IsValid() {
+			key.LastUsedIP = net.ParseIP(lastUsedIP.String())
 		}
 		keys = append(keys, &key)
 	}

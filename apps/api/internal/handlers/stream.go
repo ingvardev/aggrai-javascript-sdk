@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	appMiddleware "github.com/ingvar/aiaggregator/apps/api/internal/middleware"
+	"github.com/ingvar/aiaggregator/packages/domain"
 	"github.com/ingvar/aiaggregator/packages/providers"
 	"github.com/ingvar/aiaggregator/packages/usecases"
 )
@@ -148,6 +149,20 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// Log streaming request activity
+	h.authService.LogRequestActivity(ctx, &usecases.RequestLogParams{
+		TenantID:  tenant.ID,
+		APIUserID: appMiddleware.APIUserIDFromContext(r.Context()),
+		Action:    domain.AuditActionStreaming,
+		Provider:  providerName,
+		Model:     req.Model,
+		TokensIn:  resp.TokensIn,
+		TokensOut: resp.TokensOut,
+		Cost:      resp.Cost,
+		ClientIP:  extractClientIP(r),
+		UserAgent: r.UserAgent(),
+	})
 
 	// Send final stats
 	sendEvent(StreamEvent{

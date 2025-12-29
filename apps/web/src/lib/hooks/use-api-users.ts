@@ -6,7 +6,8 @@ import {
   createAPIUsersClient,
   APIUser,
   APIKey,
-  APIKeyWithRawKey
+  APIKeyWithRawKey,
+  ActivityEntry
 } from '@/lib/api-users'
 
 // Query keys
@@ -16,6 +17,7 @@ export const apiUsersKeys = {
   list: () => [...apiUsersKeys.lists()] as const,
   detail: (id: string) => [...apiUsersKeys.all, 'detail', id] as const,
   keys: (userId: string) => [...apiUsersKeys.all, 'keys', userId] as const,
+  activity: (userId: string) => [...apiUsersKeys.all, 'activity', userId] as const,
 }
 
 // Hooks
@@ -111,5 +113,18 @@ export function useRevokeAPIKey() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: apiUsersKeys.keys(variables.userId) })
     },
+  })
+}
+
+export function useUserActivity(userId: string) {
+  const { sessionToken } = useAuth()
+
+  return useQuery({
+    queryKey: apiUsersKeys.activity(userId),
+    queryFn: async () => {
+      const client = createAPIUsersClient(sessionToken)
+      return client.getUserActivity(userId)
+    },
+    enabled: !!sessionToken && !!userId,
   })
 }

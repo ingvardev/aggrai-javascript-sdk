@@ -32,6 +32,15 @@ export interface APIKeyWithRawKey extends APIKey {
   key: string // Raw key - ONLY SHOWN ONCE
 }
 
+export interface ActivityEntry {
+  id: string
+  action: string
+  details?: Record<string, unknown>
+  ip_address?: string
+  user_agent?: string
+  created_at: string
+}
+
 interface CreateUserRequest {
   name: string
   description?: string
@@ -120,6 +129,15 @@ export class APIUsersClient {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }))
       throw new Error(error.message || error.error || 'Failed to revoke key')
     }
+  }
+
+  // Activity
+  async getUserActivity(userId: string): Promise<ActivityEntry[]> {
+    const response = await fetch(`${this.baseUrl}/api/admin/users/${userId}/activity`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<ActivityEntry[]>(response)
   }
 }
 
