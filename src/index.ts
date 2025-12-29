@@ -24,3 +24,5 @@ export type {
 } from './types'
 
 export { AIAggregatorError } from './types'
+
+export { DEFAULT_CONFIG, ENDPOINTS, ERROR_CODES } from './constants'

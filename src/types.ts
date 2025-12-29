@@ -109,6 +109,13 @@ export interface SDKConfig {
   pollingInterval?: number
   /** Maximum polling attempts (default: 300 = 5 minutes) */
   maxPollingAttempts?: number
+  /**
+   * Use SSE (Server-Sent Events) for job status updates.
+   * - 'auto': Use SSE in browser, polling in Node.js (default)
+   * - true: Always use SSE (requires EventSource)
+   * - false: Always use polling
+   */
+  useSSE?: boolean | 'auto'
 }
 
 /** Chat completion result */

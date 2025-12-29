@@ -1,18 +1,25 @@
-import type {
-  SDKConfig,
-  CreateChatRequest,
-  ChatResponse,
-  ChatResult,
-  Job,
-} from './types'
+import type { SDKConfig, CreateChatRequest, ChatResponse, ChatResult, Job } from './types'
 import { AIAggregatorError } from './types'
+import { DEFAULT_CONFIG, ENDPOINTS, ERROR_CODES } from './constants'
+import { HttpClient } from './http'
+import { SSEClient } from './sse'
+
+/** Internal configuration with all fields required */
+interface ResolvedConfig {
+  baseUrl: string
+  apiKey: string
+  defaultProvider: string
+  defaultModel: string
+  timeout: number
+  pollingInterval: number
+  maxPollingAttempts: number
+  useSSE: boolean | 'auto'
+}
 
 /**
  * AI Aggregator SDK Client
  *
  * Provides async job-based API for AI completions.
- * The SDK calls /api/chat which creates a job internally,
- * then automatically polls for the result.
  *
  * @example
  * ```typescript
@@ -21,7 +28,6 @@ import { AIAggregatorError } from './types'
  *   apiKey: 'your-api-key',
  * })
  *
- * // Simple completion - returns Promise that resolves when job completes
  * const result = await client.chat({
  *   messages: [{ role: 'user', content: 'Hello!' }],
  *   provider: 'openai',
@@ -32,27 +38,43 @@ import { AIAggregatorError } from './types'
  * ```
  */
 export class AIAggregator {
-  private config: Required<SDKConfig>
+  private readonly config: ResolvedConfig
+  private readonly http: HttpClient
+  private readonly sse: SSEClient
 
   constructor(config: SDKConfig) {
+    this.validateConfig(config)
+
     this.config = {
-      baseUrl: config.baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      baseUrl: config.baseUrl.replace(/\/$/, ''),
       apiKey: config.apiKey,
-      defaultProvider: config.defaultProvider ?? 'openai',
+      defaultProvider: config.defaultProvider ?? DEFAULT_CONFIG.DEFAULT_PROVIDER,
       defaultModel: config.defaultModel ?? '',
-      timeout: config.timeout ?? 300000, // 5 minutes default for async jobs
-      pollingInterval: config.pollingInterval ?? 1000,
-      maxPollingAttempts: config.maxPollingAttempts ?? 300,
+      timeout: config.timeout ?? DEFAULT_CONFIG.TIMEOUT,
+      pollingInterval: config.pollingInterval ?? DEFAULT_CONFIG.POLLING_INTERVAL,
+      maxPollingAttempts: config.maxPollingAttempts ?? DEFAULT_CONFIG.MAX_POLLING_ATTEMPTS,
+      useSSE: config.useSSE ?? 'auto',
     }
+
+    this.http = new HttpClient({
+      baseUrl: this.config.baseUrl,
+      apiKey: this.config.apiKey,
+      timeout: this.config.timeout,
+    })
+
+    this.sse = new SSEClient({
+      baseUrl: this.config.baseUrl,
+      apiKey: this.config.apiKey,
+      timeout: this.config.timeout,
+    })
   }
 
   /**
    * Send a chat request and wait for the result.
    *
-   * This method:
-   * 1. Calls /api/chat to create an async job
-   * 2. Automatically subscribes to job updates
-   * 3. Returns a Promise that resolves when the job completes
+   * @param request - Chat request parameters
+   * @param signal - Optional AbortSignal to cancel the request
+   * @returns Promise resolving to chat completion result
    *
    * @example
    * ```typescript
@@ -61,85 +83,127 @@ export class AIAggregator {
    * })
    * console.log(result.content)
    * ```
+   *
+   * @example With cancellation
+   * ```typescript
+   * const controller = new AbortController()
+   * setTimeout(() => controller.abort(), 10000)
+   *
+   * try {
+   *   const result = await client.chat({ prompt: 'Hello' }, controller.signal)
+   * } catch (e) {
+   *   if (e.code === 'aborted') console.log('Cancelled!')
+   * }
+   * ```
    */
-  async chat(request: CreateChatRequest): Promise<ChatResult> {
-    // Step 1: Call /api/chat to create job
-    const chatResponse = await this.createChat(request)
+  async chat(request: CreateChatRequest, signal?: AbortSignal): Promise<ChatResult> {
+    this.validateRequest(request)
 
-    // Step 2: Wait for job to complete
-    return this.waitForJob(chatResponse.jobId)
+    const chatResponse = await this.createChat(request, signal)
+    return this.waitForJob(chatResponse.jobId, signal)
   }
 
   /**
    * Send a chat request without waiting for the result.
    * Returns the job ID immediately for manual tracking.
    *
-   * @example
-   * ```typescript
-   * const { jobId } = await client.chatAsync({
-   *   messages: [{ role: 'user', content: 'Hello!' }],
-   * })
-   *
-   * // Later: check status or wait
-   * const result = await client.waitForJob(jobId)
-   * ```
+   * @param request - Chat request parameters
+   * @param signal - Optional AbortSignal to cancel the request
+   * @returns Promise resolving to job creation response
    */
-  async chatAsync(request: CreateChatRequest): Promise<ChatResponse> {
-    return this.createChat(request)
+  async chatAsync(request: CreateChatRequest, signal?: AbortSignal): Promise<ChatResponse> {
+    this.validateRequest(request)
+    return this.createChat(request, signal)
   }
 
   /**
    * Wait for a job to complete.
-   * Returns a Promise that resolves with the result.
+   * Uses SSE when available, falls back to polling.
+   *
+   * @param jobId - Job ID to wait for
+   * @param signal - Optional AbortSignal to cancel waiting
+   * @returns Promise resolving to chat completion result
    */
-  async waitForJob(jobId: string): Promise<ChatResult> {
-    let attempts = 0
-
-    while (attempts < this.config.maxPollingAttempts) {
-      const job = await this.getJobStatus(jobId)
-
-      if (job.status === 'completed') {
-        return this.jobToResult(job)
-      }
-
-      if (job.status === 'failed') {
-        throw new AIAggregatorError(
-          job.error ?? 'Job failed',
-          'job_failed',
-          undefined,
-          { jobId, job }
-        )
-      }
-
-      await this.sleep(this.config.pollingInterval)
-      attempts++
+  async waitForJob(jobId: string, signal?: AbortSignal): Promise<ChatResult> {
+    if (!jobId) {
+      throw new AIAggregatorError('Job ID is required', ERROR_CODES.VALIDATION_ERROR)
     }
 
-    throw new AIAggregatorError(
-      'Job polling timeout',
-      'timeout',
-      undefined,
-      { jobId, attempts }
-    )
+    if (this.shouldUseSSE()) {
+      try {
+        return await this.sse.waitForJob(jobId, signal)
+      } catch (error) {
+        // SSE failed, fallback to polling (unless aborted)
+        if (error instanceof AIAggregatorError && error.code === ERROR_CODES.ABORTED) {
+          throw error
+        }
+        return this.waitForJobPolling(jobId, signal)
+      }
+    }
+
+    return this.waitForJobPolling(jobId, signal)
   }
 
   /**
    * Get the current status of a job.
+   *
+   * @param jobId - Job ID to check
+   * @param signal - Optional AbortSignal
+   * @returns Promise resolving to job object
    */
-  async getJobStatus(jobId: string): Promise<Job> {
-    return this.request<Job>('GET', `/api/chat/${jobId}`)
+  async getJobStatus(jobId: string, signal?: AbortSignal): Promise<Job> {
+    if (!jobId) {
+      throw new AIAggregatorError('Job ID is required', ERROR_CODES.VALIDATION_ERROR)
+    }
+
+    return this.http.request<Job>({
+      method: 'GET',
+      path: ENDPOINTS.JOB(jobId),
+      signal,
+      retries: 1, // Don't retry status checks
+    })
   }
 
   /**
    * Cancel a pending job.
+   *
+   * @param jobId - Job ID to cancel
+   * @param signal - Optional AbortSignal
    */
-  async cancelJob(jobId: string): Promise<void> {
-    await this.request('DELETE', `/api/chat/${jobId}`)
+  async cancelJob(jobId: string, signal?: AbortSignal): Promise<void> {
+    if (!jobId) {
+      throw new AIAggregatorError('Job ID is required', ERROR_CODES.VALIDATION_ERROR)
+    }
+
+    await this.http.request<void>({
+      method: 'DELETE',
+      path: ENDPOINTS.JOB(jobId),
+      signal,
+      retries: 1,
+    })
   }
 
   // ============ Private Methods ============
 
-  private async createChat(request: CreateChatRequest): Promise<ChatResponse> {
+  private validateConfig(config: SDKConfig): void {
+    if (!config.baseUrl) {
+      throw new AIAggregatorError('baseUrl is required', ERROR_CODES.VALIDATION_ERROR)
+    }
+    if (!config.apiKey) {
+      throw new AIAggregatorError('apiKey is required', ERROR_CODES.VALIDATION_ERROR)
+    }
+  }
+
+  private validateRequest(request: CreateChatRequest): void {
+    if (!request.prompt && (!request.messages || request.messages.length === 0)) {
+      throw new AIAggregatorError(
+        "Either 'prompt' or 'messages' is required",
+        ERROR_CODES.VALIDATION_ERROR
+      )
+    }
+  }
+
+  private async createChat(request: CreateChatRequest, signal?: AbortSignal): Promise<ChatResponse> {
     const body = {
       prompt: request.prompt,
       messages: request.messages,
@@ -152,79 +216,49 @@ export class AIAggregator {
       metadata: request.metadata,
     }
 
-    return this.request<ChatResponse>('POST', '/api/chat', body)
+    return this.http.request<ChatResponse>({
+      method: 'POST',
+      path: ENDPOINTS.CHAT,
+      body,
+      signal,
+    })
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown
-  ): Promise<T> {
-    const url = `${this.config.baseUrl}${path}`
+  private async waitForJobPolling(jobId: string, signal?: AbortSignal): Promise<ChatResult> {
+    let attempts = 0
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      this.config.timeout
-    )
-
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': this.config.apiKey,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        let errorData: unknown
-        try {
-          errorData = await response.json()
-        } catch {
-          errorData = await response.text()
-        }
-
-        const message =
-          typeof errorData === 'object' &&
-          errorData !== null &&
-          'message' in errorData
-            ? String((errorData as { message: unknown }).message)
-            : `Request failed with status ${response.status}`
-
-        const code =
-          typeof errorData === 'object' &&
-          errorData !== null &&
-          'error' in errorData
-            ? String((errorData as { error: unknown }).error)
-            : 'request_failed'
-
-        throw new AIAggregatorError(message, code, response.status, errorData)
+    while (attempts < this.config.maxPollingAttempts) {
+      if (signal?.aborted) {
+        throw new AIAggregatorError('Request aborted', ERROR_CODES.ABORTED, undefined, { jobId })
       }
 
-      return response.json()
-    } catch (error) {
-      clearTimeout(timeoutId)
+      const job = await this.getJobStatus(jobId, signal)
 
-      if (error instanceof AIAggregatorError) {
-        throw error
+      if (job.status === 'completed') {
+        return this.jobToResult(job)
       }
 
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new AIAggregatorError('Request timeout', 'timeout')
+      if (job.status === 'failed') {
+        throw new AIAggregatorError(job.error ?? 'Job failed', ERROR_CODES.JOB_FAILED, undefined, {
+          jobId,
+          job,
+        })
       }
 
-      throw new AIAggregatorError(
-        error instanceof Error ? error.message : 'Network error',
-        'network_error',
-        undefined,
-        error
-      )
+      await this.sleep(this.config.pollingInterval, signal)
+      attempts++
     }
+
+    throw new AIAggregatorError('Job polling timeout', ERROR_CODES.TIMEOUT, undefined, {
+      jobId,
+      attempts,
+    })
+  }
+
+  private shouldUseSSE(): boolean {
+    if (this.config.useSSE === true) return true
+    if (this.config.useSSE === false) return false
+    return typeof fetch !== 'undefined'
   }
 
   private jobToResult(job: Job): ChatResult {
@@ -243,7 +277,17 @@ export class AIAggregator {
     }
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
+  private sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(resolve, ms)
+
+      if (signal) {
+        const abortHandler = () => {
+          clearTimeout(timeout)
+          reject(new AIAggregatorError('Request aborted', ERROR_CODES.ABORTED))
+        }
+        signal.addEventListener('abort', abortHandler, { once: true })
+      }
+    })
   }
 }
