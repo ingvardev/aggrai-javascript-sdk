@@ -152,3 +152,68 @@ export class AIAggregatorError extends Error {
     this.name = 'AIAggregatorError'
   }
 }
+
+// ============================================================
+// Workflow Execution Types
+// ============================================================
+
+/** Workflow execution configuration */
+export interface WorkflowExecutionConfig {
+  baseUrl: string
+  apiKey: string
+  timeout?: number
+}
+
+/** Base workflow execution event */
+export interface BaseWorkflowEvent {
+  type: string
+  executionId: string
+  timestamp: string
+}
+
+/** Intake question event */
+export interface IntakeQuestionEvent extends BaseWorkflowEvent {
+  type: 'intake_question'
+  nodeId: string
+  questionId: string
+  token: string
+  question: {
+    text: string
+    field?: string
+    description?: string
+    type?: 'text' | 'number' | 'boolean' | 'select'
+    options?: string[]
+    required?: boolean
+  }
+}
+
+/** Intake answer recorded event */
+export interface IntakeAnswerRecordedEvent extends BaseWorkflowEvent {
+  type: 'intake_answer_recorded'
+  nodeId: string
+  questionId: string
+  value: unknown
+}
+
+/** Execution completed event */
+export interface ExecutionCompletedEvent extends BaseWorkflowEvent {
+  type: 'execution_completed'
+  status: 'completed'
+  output: Record<string, unknown>
+  duration: number
+}
+
+/** Execution failed event */
+export interface ExecutionFailedEvent extends BaseWorkflowEvent {
+  type: 'execution_failed'
+  status: 'failed'
+  error: string
+  nodeId?: string
+}
+
+/** All workflow execution event types */
+export type WorkflowExecutionEvent =
+  | IntakeQuestionEvent
+  | IntakeAnswerRecordedEvent
+  | ExecutionCompletedEvent
+  | ExecutionFailedEvent

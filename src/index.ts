@@ -7,6 +7,7 @@
  */
 
 export { AIAggregator } from './client'
+export { WorkflowExecution } from './workflow'
 
 export type {
   SDKConfig,
@@ -21,6 +22,13 @@ export type {
   Tool,
   ToolFunction,
   ToolCall,
+  // Workflow types
+  WorkflowExecutionConfig,
+  WorkflowExecutionEvent,
+  IntakeQuestionEvent,
+  IntakeAnswerRecordedEvent,
+  ExecutionCompletedEvent,
+  ExecutionFailedEvent,
 } from './types'
 
 export { AIAggregatorError } from './types'

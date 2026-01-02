@@ -1,8 +1,9 @@
-import type { SDKConfig, CreateChatRequest, ChatResponse, ChatResult, Job } from './types'
+import type { SDKConfig, CreateChatRequest, ChatResponse, ChatResult, Job, WorkflowExecutionConfig } from './types'
 import { AIAggregatorError } from './types'
 import { DEFAULT_CONFIG, ENDPOINTS, ERROR_CODES } from './constants'
 import { HttpClient } from './http'
 import { SSEClient } from './sse'
+import { WorkflowExecution } from './workflow'
 
 /** Internal configuration with all fields required */
 interface ResolvedConfig {
@@ -289,5 +290,58 @@ export class AIAggregator {
         signal.addEventListener('abort', abortHandler, { once: true })
       }
     })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Workflow Execution
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Execute a workflow and return a real-time event stream
+   *
+   * Creates a new workflow execution and returns a WorkflowExecution instance
+   * that provides SSE-based real-time events for intake questions, progress,
+   * and completion.
+   *
+   * @param workflowId - ID of the workflow to execute
+   * @param options - Optional execution configuration
+   * @returns WorkflowExecution instance for event handling
+   *
+   * @example
+   * ```typescript
+   * const execution = await client.executeWorkflow('workflow-id')
+   *
+   * execution
+   *   .on('question', async (q) => {
+   *     console.log('Question:', q.text)
+   *     await execution.answer(getUserInput(q.field))
+   *   })
+   *   .on('completed', (result) => {
+   *     console.log('Completed:', result.outputs)
+   *   })
+   *   .on('failed', (error) => {
+   *     console.error('Failed:', error.message)
+   *   })
+   * ```
+   */
+  async executeWorkflow(
+    workflowId: string,
+    options: { variables?: Record<string, unknown> } = {}
+  ): Promise<WorkflowExecution> {
+    const response = await this.http.request<{ executionId: string }>({
+      method: 'POST',
+      path: `/api/workflows/${workflowId}/execute`,
+      body: { variables: options.variables ?? {} },
+    })
+
+    const executionConfig: WorkflowExecutionConfig = {
+      baseUrl: this.config.baseUrl,
+      apiKey: this.config.apiKey,
+    }
+
+    const execution = new WorkflowExecution(response.executionId, executionConfig)
+    execution.connect()
+
+    return execution
   }
 }
